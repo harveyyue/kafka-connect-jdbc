@@ -157,6 +157,7 @@ public class GenericDatabaseDialect implements DatabaseDialect {
   private final int batchMaxRows;
   private final TimeZone timeZone;
   private final JdbcSourceConnectorConfig.TimestampGranularity tsGranularity;
+  protected final JdbcSinkConfig.TopicNamingMode topicNamingMode;
 
   /**
    * Create a new dialect instance with the given connector configuration.
@@ -218,6 +219,12 @@ public class GenericDatabaseDialect implements DatabaseDialect {
       tsGranularity = TimestampGranularity.get((JdbcSourceConnectorConfig) config);
     } else {
       tsGranularity = TimestampGranularity.CONNECT_LOGICAL;
+    }
+
+    if (config instanceof JdbcSinkConfig) {
+      topicNamingMode = ((JdbcSinkConfig) config).topicNamingMode;
+    } else {
+      topicNamingMode = JdbcSinkConfig.TopicNamingMode.NORMAL;
     }
   }
 

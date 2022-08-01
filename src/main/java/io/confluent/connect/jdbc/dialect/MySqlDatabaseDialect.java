@@ -18,6 +18,7 @@ package io.confluent.connect.jdbc.dialect;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.connect.data.Date;
 import org.apache.kafka.connect.data.Decimal;
+import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Time;
 import org.apache.kafka.connect.data.Timestamp;
 
@@ -28,6 +29,7 @@ import java.sql.SQLException;
 import java.util.Collection;
 
 import io.confluent.connect.jdbc.dialect.DatabaseDialectProvider.SubprotocolBasedProvider;
+import io.confluent.connect.jdbc.sink.JdbcSinkConfig;
 import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
 import io.confluent.connect.jdbc.util.ColumnId;
 import io.confluent.connect.jdbc.util.ExpressionBuilder;
@@ -85,6 +87,42 @@ public class MySqlDatabaseDialect extends GenericDatabaseDialect {
 
     log.trace("Initializing PreparedStatement fetch direction to FETCH_FORWARD for '{}'", stmt);
     stmt.setFetchDirection(ResultSet.FETCH_FORWARD);
+  }
+
+  @Override
+  public TableId parseTableIdentifier(String fqn) {
+    TableId tableId = super.parseTableIdentifier(fqn);
+    // check topic naming mode
+    if (topicNamingMode == JdbcSinkConfig.TopicNamingMode.DEBEZIUM) {
+      return new TableId(tableId.schemaName(), null, tableId.tableName());
+    } else {
+      return tableId;
+    }
+  }
+
+  @Override
+  public void writeColumnSpec(
+      ExpressionBuilder builder,
+      SinkRecordField f
+  ) {
+    builder.appendColumnName(f.name());
+    builder.append(" ");
+    String sqlType = getSqlType(f);
+    builder.append(sqlType);
+    if (f.defaultValue() != null && !f.schemaType().equals(Schema.Type.STRING)) {
+      builder.append(" DEFAULT ");
+      formatColumnValue(
+          builder,
+          f.schemaName(),
+          f.schemaParameters(),
+          f.schemaType(),
+          f.defaultValue()
+      );
+    } else if (isColumnOptional(f)) {
+      builder.append(" NULL");
+    } else {
+      builder.append(" NOT NULL");
+    }
   }
 
   @Override

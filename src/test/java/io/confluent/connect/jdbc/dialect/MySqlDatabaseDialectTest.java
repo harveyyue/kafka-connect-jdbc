@@ -15,6 +15,7 @@
 
 package io.confluent.connect.jdbc.dialect;
 
+import io.confluent.connect.jdbc.sink.JdbcSinkConfig;
 import org.apache.kafka.connect.data.Date;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Schema;
@@ -89,6 +90,15 @@ public class MySqlDatabaseDialectTest extends BaseDialectTest<MySqlDatabaseDiale
   @Test
   public void shouldMapTimestampSchemaTypeToTimestampSqlType() {
     assertTimestampMapping("DATETIME(3)");
+  }
+
+  @Test
+  public void shouldParseDebeziumTableIdentifier() {
+    JdbcSinkConfig jdbcSinkConfig = sinkConfigWithUrl(
+        "jdbc:mysql://something", "topic.naming.mode", "debezium");
+    MySqlDatabaseDialect mySqlDatabaseDialect = new MySqlDatabaseDialect(jdbcSinkConfig);
+    TableId tableId = mySqlDatabaseDialect.parseTableIdentifier("harvey_test_sechub.debezium_test.test_1");
+    assertEquals("\"debezium_test\".\"test_1\"", tableId.toString());
   }
 
   @Test
