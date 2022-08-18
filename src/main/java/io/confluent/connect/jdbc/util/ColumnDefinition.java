@@ -45,7 +45,7 @@ public class ColumnDefinition {
   private final boolean searchable;
   private final boolean currency;
   private final boolean signedNumbers;
-  private final boolean isPrimaryKey;
+  private boolean isPrimaryKey;
   private final Nullability nullability;
   private final Mutability mutability;
   private final String classNameForType;
@@ -128,6 +128,15 @@ public class ColumnDefinition {
    */
   public boolean isPrimaryKey() {
     return isPrimaryKey;
+  }
+
+  /**
+   * For TidbDatabaseDialect to adjust primary key.
+   *
+   * @param isPrimaryKey Indicates whether the column is part of the table's primary key.
+   */
+  public void setPrimaryKey(boolean isPrimaryKey) {
+    this.isPrimaryKey = isPrimaryKey;
   }
 
   /**

@@ -179,7 +179,8 @@ public class DbStructure {
 
     for (SinkRecordField missingField: missingFields) {
       if (!missingField.isOptional() && missingField.defaultValue() == null) {
-        throw new TableAlterOrCreateException(String.format(
+        // Adjust TableAlterOrCreateException exception to warn log
+        log.warn(String.format(
             "Cannot ALTER %s %s to add missing field %s, as the field is not optional and does "
             + "not have a default value",
             type.jdbcName(),
