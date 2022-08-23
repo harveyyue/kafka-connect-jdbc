@@ -78,8 +78,8 @@ public class PostgresViewIT extends BaseConnectorIT  {
     topic = tableName + "_view";
     String jdbcURL = String
         .format("jdbc:postgresql://localhost:%s/postgres", pg.getEmbeddedPostgres().getPort());
-    props.put(JdbcSinkConfig.CONNECTION_URL, jdbcURL);
-    props.put(JdbcSinkConfig.CONNECTION_USER, "postgres");
+    props.put(JdbcSinkConfig.CONNECTION_URL_CONFIG, jdbcURL);
+    props.put(JdbcSinkConfig.CONNECTION_USER_CONFIG, "postgres");
     props.put(JdbcSinkConfig.TABLE_TYPES_CONFIG, "VIEW");
     props.put("pk.mode", "none");
     props.put("topics", topic);

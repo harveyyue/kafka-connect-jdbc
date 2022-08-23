@@ -68,9 +68,9 @@ public class PreparedStatementBinderTest {
   @Before
   public void beforeEach() {
     Map<String, String> props = new HashMap<>();
-    props.put(JdbcSinkConfig.CONNECTION_URL, "jdbc:bogus:something");
-    props.put(JdbcSinkConfig.CONNECTION_USER, "sa");
-    props.put(JdbcSinkConfig.CONNECTION_PASSWORD, "password");
+    props.put(JdbcSinkConfig.CONNECTION_URL_CONFIG, "jdbc:bogus:something");
+    props.put(JdbcSinkConfig.CONNECTION_USER_CONFIG, "sa");
+    props.put(JdbcSinkConfig.CONNECTION_PASSWORD_CONFIG, "password");
     JdbcSinkConfig config = new JdbcSinkConfig(props);
     dialect = new GenericDatabaseDialect(config);
   }

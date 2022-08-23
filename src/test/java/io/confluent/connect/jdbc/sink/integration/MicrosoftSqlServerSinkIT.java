@@ -159,9 +159,9 @@ public class MicrosoftSqlServerSinkIT extends BaseConnectorIT {
         props.put("confluent.topic.bootstrap.servers", connect.kafka().bootstrapServers());
         props.put("confluent.topic.replication.factor", "1");
 
-        props.put(JdbcSinkConfig.CONNECTION_URL, MSSQL_URL);
-        props.put(JdbcSinkConfig.CONNECTION_USER, USER);
-        props.put(JdbcSinkConfig.CONNECTION_PASSWORD, PASS);
+        props.put(JdbcSinkConfig.CONNECTION_URL_CONFIG, MSSQL_URL);
+        props.put(JdbcSinkConfig.CONNECTION_USER_CONFIG, USER);
+        props.put(JdbcSinkConfig.CONNECTION_PASSWORD_CONFIG, PASS);
         props.put("pk.mode", "none");
         props.put("topics", topic);
         return props;

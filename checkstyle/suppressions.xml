@@ -23,4 +23,10 @@
 
     <suppress checks="ParameterNumber"
               files="(ColumnDefinition|GenericDatabaseDialect|SqlServerDatabaseDialect|PostgreSqlDatabaseDialect|TimestampIncrementingTableQuerier).java"/>
+
+    <suppress checks="LineLength"
+              files="(Metronome|Metrics).java"/>
+
+    <suppress checks="JavadocParagraph"
+              files="(Metronome|Metrics).java"/>
 </suppressions>

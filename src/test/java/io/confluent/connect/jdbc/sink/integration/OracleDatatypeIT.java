@@ -57,9 +57,9 @@ public class OracleDatatypeIT extends BaseConnectorIT {
         props = baseSinkProps();
 
         tableName = "TEST";
-        props.put(JdbcSinkConfig.CONNECTION_URL, oracle.getJdbcUrl());
-        props.put(JdbcSinkConfig.CONNECTION_USER, oracle.getUsername());
-        props.put(JdbcSinkConfig.CONNECTION_PASSWORD, oracle.getPassword());
+        props.put(JdbcSinkConfig.CONNECTION_URL_CONFIG, oracle.getJdbcUrl());
+        props.put(JdbcSinkConfig.CONNECTION_USER_CONFIG, oracle.getUsername());
+        props.put(JdbcSinkConfig.CONNECTION_PASSWORD_CONFIG, oracle.getPassword());
         props.put(JdbcSinkConfig.PK_MODE, "record_value");
         props.put(JdbcSinkConfig.PK_FIELDS, "KEY");
         props.put(JdbcSinkConfig.AUTO_CREATE, "false");

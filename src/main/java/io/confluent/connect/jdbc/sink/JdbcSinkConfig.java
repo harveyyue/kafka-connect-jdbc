@@ -27,9 +27,7 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.stream.Collectors;
 
-import io.confluent.connect.jdbc.source.JdbcSourceConnectorConfig;
-
-import io.confluent.connect.jdbc.util.ConfigUtils;
+import io.confluent.connect.jdbc.JdbcConfig;
 import io.confluent.connect.jdbc.util.DatabaseDialectRecommender;
 import io.confluent.connect.jdbc.util.DeleteEnabledRecommender;
 import io.confluent.connect.jdbc.util.EnumRecommender;
@@ -38,12 +36,11 @@ import io.confluent.connect.jdbc.util.QuoteMethod;
 import io.confluent.connect.jdbc.util.StringUtils;
 import io.confluent.connect.jdbc.util.TableType;
 import io.confluent.connect.jdbc.util.TimeZoneValidator;
-import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.config.types.Password;
 
-public class JdbcSinkConfig extends AbstractConfig {
+public class JdbcSinkConfig extends JdbcConfig {
 
   public enum InsertMode {
     INSERT,
@@ -71,42 +68,6 @@ public class JdbcSinkConfig extends AbstractConfig {
           "__connect_offset"
       )
   );
-
-  public static final String CONNECTION_URL = JdbcSourceConnectorConfig.CONNECTION_URL_CONFIG;
-  private static final String CONNECTION_URL_DOC =
-      "JDBC connection URL.\n"
-          + "For example: ``jdbc:oracle:thin:@localhost:1521:orclpdb1``, "
-          + "``jdbc:mysql://localhost/db_name``, "
-          + "``jdbc:sqlserver://localhost;instance=SQLEXPRESS;"
-          + "databaseName=db_name``";
-  private static final String CONNECTION_URL_DISPLAY = "JDBC URL";
-
-  public static final String CONNECTION_USER = JdbcSourceConnectorConfig.CONNECTION_USER_CONFIG;
-  private static final String CONNECTION_USER_DOC = "JDBC connection user.";
-  private static final String CONNECTION_USER_DISPLAY = "JDBC User";
-
-  public static final String CONNECTION_PASSWORD =
-      JdbcSourceConnectorConfig.CONNECTION_PASSWORD_CONFIG;
-  private static final String CONNECTION_PASSWORD_DOC = "JDBC connection password.";
-  private static final String CONNECTION_PASSWORD_DISPLAY = "JDBC Password";
-
-  public static final String CONNECTION_ATTEMPTS =
-      JdbcSourceConnectorConfig.CONNECTION_ATTEMPTS_CONFIG;
-  private static final String CONNECTION_ATTEMPTS_DOC =
-      JdbcSourceConnectorConfig.CONNECTION_ATTEMPTS_DOC;
-  private static final String CONNECTION_ATTEMPTS_DISPLAY =
-      JdbcSourceConnectorConfig.CONNECTION_ATTEMPTS_DISPLAY;
-  public static final int CONNECTION_ATTEMPTS_DEFAULT =
-      JdbcSourceConnectorConfig.CONNECTION_ATTEMPTS_DEFAULT;
-
-  public static final String CONNECTION_BACKOFF =
-      JdbcSourceConnectorConfig.CONNECTION_BACKOFF_CONFIG;
-  private static final String CONNECTION_BACKOFF_DOC =
-      JdbcSourceConnectorConfig.CONNECTION_BACKOFF_DOC;
-  private static final String CONNECTION_BACKOFF_DISPLAY =
-      JdbcSourceConnectorConfig.CONNECTION_BACKOFF_DISPLAY;
-  public static final long CONNECTION_BACKOFF_DEFAULT =
-      JdbcSourceConnectorConfig.CONNECTION_BACKOFF_DEFAULT;
 
   public static final String TABLE_NAME_FORMAT = "table.name.format";
   private static final String TABLE_NAME_FORMAT_DEFAULT = "${topic}";
@@ -222,32 +183,6 @@ public class JdbcSinkConfig extends AbstractConfig {
   private static final String DDL_GROUP = "DDL Support";
   private static final String RETRIES_GROUP = "Retries";
 
-  public static final String DIALECT_NAME_CONFIG = "dialect.name";
-  private static final String DIALECT_NAME_DISPLAY = "Database Dialect";
-  public static final String DIALECT_NAME_DEFAULT = "";
-  private static final String DIALECT_NAME_DOC =
-      "The name of the database dialect that should be used for this connector. By default this "
-      + "is empty, and the connector automatically determines the dialect based upon the "
-      + "JDBC connection URL. Use this if you want to override that behavior and use a "
-      + "specific dialect. All properly-packaged dialects in the JDBC connector plugin "
-      + "can be used.";
-
-  public static final String DB_TIMEZONE_CONFIG = "db.timezone";
-  public static final String DB_TIMEZONE_DEFAULT = "UTC";
-  private static final String DB_TIMEZONE_CONFIG_DOC =
-      "Name of the JDBC timezone that should be used in the connector when "
-      + "inserting time-based values. Defaults to UTC.";
-  private static final String DB_TIMEZONE_CONFIG_DISPLAY = "DB Time Zone";
-
-  public static final String QUOTE_SQL_IDENTIFIERS_CONFIG =
-      JdbcSourceConnectorConfig.QUOTE_SQL_IDENTIFIERS_CONFIG;
-  public static final String QUOTE_SQL_IDENTIFIERS_DEFAULT =
-      JdbcSourceConnectorConfig.QUOTE_SQL_IDENTIFIERS_DEFAULT;
-  public static final String QUOTE_SQL_IDENTIFIERS_DOC =
-      JdbcSourceConnectorConfig.QUOTE_SQL_IDENTIFIERS_DOC;
-  private static final String QUOTE_SQL_IDENTIFIERS_DISPLAY =
-      JdbcSourceConnectorConfig.QUOTE_SQL_IDENTIFIERS_DISPLAY;
-
   public static final String TABLE_TYPES_CONFIG = "table.types";
   private static final String TABLE_TYPES_DISPLAY = "Table Types";
   public static final String TABLE_TYPES_DEFAULT = TableType.TABLE.toString();
@@ -280,7 +215,7 @@ public class JdbcSinkConfig extends AbstractConfig {
   public static final ConfigDef CONFIG_DEF = new ConfigDef()
         // Connection
         .define(
-            CONNECTION_URL,
+            CONNECTION_URL_CONFIG,
             ConfigDef.Type.STRING,
             ConfigDef.NO_DEFAULT_VALUE,
             ConfigDef.Importance.HIGH,
@@ -291,7 +226,7 @@ public class JdbcSinkConfig extends AbstractConfig {
             CONNECTION_URL_DISPLAY
         )
         .define(
-            CONNECTION_USER,
+            CONNECTION_USER_CONFIG,
             ConfigDef.Type.STRING,
             null,
             ConfigDef.Importance.HIGH,
@@ -302,7 +237,7 @@ public class JdbcSinkConfig extends AbstractConfig {
             CONNECTION_USER_DISPLAY
         )
         .define(
-            CONNECTION_PASSWORD,
+            CONNECTION_PASSWORD_CONFIG,
             ConfigDef.Type.PASSWORD,
             null,
             ConfigDef.Importance.HIGH,
@@ -326,7 +261,7 @@ public class JdbcSinkConfig extends AbstractConfig {
             DatabaseDialectRecommender.INSTANCE
         )
         .define(
-            CONNECTION_ATTEMPTS,
+            CONNECTION_ATTEMPTS_CONFIG,
             ConfigDef.Type.INT,
             CONNECTION_ATTEMPTS_DEFAULT,
             ConfigDef.Range.atLeast(1),
@@ -337,7 +272,7 @@ public class JdbcSinkConfig extends AbstractConfig {
             ConfigDef.Width.SHORT,
             CONNECTION_ATTEMPTS_DISPLAY
         ).define(
-            CONNECTION_BACKOFF,
+            CONNECTION_BACKOFF_CONFIG,
             ConfigDef.Type.LONG,
             CONNECTION_BACKOFF_DEFAULT,
             ConfigDef.Importance.LOW,
@@ -521,7 +456,6 @@ public class JdbcSinkConfig extends AbstractConfig {
             RETRY_BACKOFF_MS_DISPLAY
         );
 
-  public final String connectorName;
   public final String connectionUrl;
   public final String connectionUser;
   public final String connectionPassword;
@@ -545,12 +479,11 @@ public class JdbcSinkConfig extends AbstractConfig {
 
   public JdbcSinkConfig(Map<?, ?> props) {
     super(CONFIG_DEF, props);
-    connectorName = ConfigUtils.connectorName(props);
-    connectionUrl = getString(CONNECTION_URL);
-    connectionUser = getString(CONNECTION_USER);
-    connectionPassword = getPasswordValue(CONNECTION_PASSWORD);
-    connectionAttempts = getInt(CONNECTION_ATTEMPTS);
-    connectionBackoffMs = getLong(CONNECTION_BACKOFF);
+    connectionUrl = getString(CONNECTION_URL_CONFIG);
+    connectionUser = getString(CONNECTION_USER_CONFIG);
+    connectionPassword = getPasswordValue(CONNECTION_PASSWORD_CONFIG);
+    connectionAttempts = getInt(CONNECTION_ATTEMPTS_CONFIG);
+    connectionBackoffMs = getLong(CONNECTION_BACKOFF_CONFIG);
     tableNameFormat = getString(TABLE_NAME_FORMAT).trim();
     batchSize = getInt(BATCH_SIZE);
     deleteEnabled = getBoolean(DELETE_ENABLED);
@@ -582,16 +515,17 @@ public class JdbcSinkConfig extends AbstractConfig {
     return null;
   }
 
-  public String connectorName() {
-    return connectorName;
-  }
-
   public EnumSet<TableType> tableTypes() {
     return tableTypes;
   }
 
   public Set<String> tableTypeNames() {
     return tableTypes().stream().map(TableType::toString).collect(Collectors.toSet());
+  }
+
+  @Override
+  public String getContextName() {
+    return "sink";
   }
 
   private static class EnumValidator implements ConfigDef.Validator {

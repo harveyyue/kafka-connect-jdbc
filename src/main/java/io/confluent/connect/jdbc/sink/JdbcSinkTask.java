@@ -32,6 +32,8 @@ import java.util.Map;
 
 import io.confluent.connect.jdbc.dialect.DatabaseDialect;
 import io.confluent.connect.jdbc.dialect.DatabaseDialects;
+import io.confluent.connect.jdbc.metrics.JdbcSinkMetrics;
+import io.confluent.connect.jdbc.util.Clock;
 import io.confluent.connect.jdbc.util.Version;
 
 public class JdbcSinkTask extends SinkTask {
@@ -42,6 +44,8 @@ public class JdbcSinkTask extends SinkTask {
   JdbcSinkConfig config;
   JdbcDbWriter writer;
   int remainingRetries;
+  JdbcSinkMetrics jdbcSinkMetrics;
+  Clock clock = Clock.system();
 
   @Override
   public void start(final Map<String, String> props) {
@@ -55,6 +59,8 @@ public class JdbcSinkTask extends SinkTask {
       // Will occur in Connect runtimes earlier than 2.6
       reporter = null;
     }
+    jdbcSinkMetrics = new JdbcSinkMetrics(config);
+    jdbcSinkMetrics.register();
   }
 
   void initWriter() {
@@ -73,6 +79,7 @@ public class JdbcSinkTask extends SinkTask {
     if (records.isEmpty()) {
       return;
     }
+    final long start = records.stream().findFirst().get().timestamp();
     final SinkRecord first = records.iterator().next();
     final int recordsCount = records.size();
     log.debug(
@@ -124,6 +131,7 @@ public class JdbcSinkTask extends SinkTask {
       }
     }
     remainingRetries = config.maxRetries;
+    jdbcSinkMetrics.setMilliSecondsBehindSource(clock.currentTimeInMillis() - start);
   }
 
   private void unrollAndRetry(Collection<SinkRecord> records) {
@@ -161,6 +169,7 @@ public class JdbcSinkTask extends SinkTask {
     log.info("Stopping task");
     try {
       writer.closeQuietly();
+      jdbcSinkMetrics.unregister();
     } finally {
       try {
         if (dialect != null) {

@@ -485,7 +485,7 @@ public class JdbcSinkTaskTest extends EasyMockSupport {
 
   private Map<String, String> setupBasicProps(int maxRetries, long retryBackoffMs) {
     Map<String, String> props = new HashMap<>();
-    props.put(JdbcSinkConfig.CONNECTION_URL, "stub");
+    props.put(JdbcSinkConfig.CONNECTION_URL_CONFIG, "stub");
     props.put(JdbcSinkConfig.MAX_RETRIES, String.valueOf(maxRetries));
     props.put(JdbcSinkConfig.RETRY_BACKOFF_MS, String.valueOf(retryBackoffMs));
     return props;

@@ -17,7 +17,6 @@ package io.confluent.connect.jdbc.source;
 
 import java.sql.Connection;
 import java.sql.Timestamp;
-import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -28,6 +27,7 @@ import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.microsoft.sqlserver.jdbc.SQLServerConnection;
+import io.confluent.connect.jdbc.JdbcConfig;
 import io.confluent.connect.jdbc.dialect.DatabaseDialect;
 import io.confluent.connect.jdbc.dialect.DatabaseDialects;
 import io.confluent.connect.jdbc.util.DatabaseDialectRecommender;
@@ -40,7 +40,6 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
-import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.Config;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigDef.Importance;
@@ -56,44 +55,10 @@ import org.apache.kafka.connect.errors.ConnectException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class JdbcSourceConnectorConfig extends AbstractConfig {
+public class JdbcSourceConnectorConfig extends JdbcConfig {
 
   private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceConnectorConfig.class);
   private static Pattern INVALID_CHARS = Pattern.compile("[^a-zA-Z0-9._-]");
-
-  public static final String CONNECTION_PREFIX = "connection.";
-
-  public static final String CONNECTION_URL_CONFIG = CONNECTION_PREFIX + "url";
-  private static final String CONNECTION_URL_DOC =
-      "JDBC connection URL.\n"
-          + "For example: ``jdbc:oracle:thin:@localhost:1521:orclpdb1``, "
-          + "``jdbc:mysql://localhost/db_name``, "
-          + "``jdbc:sqlserver://localhost;instance=SQLEXPRESS;"
-          + "databaseName=db_name``";
-  private static final String CONNECTION_URL_DISPLAY = "JDBC URL";
-  private static final String CONNECTION_URL_DEFAULT = "";
-
-  public static final String CONNECTION_USER_CONFIG = CONNECTION_PREFIX + "user";
-  private static final String CONNECTION_USER_DOC = "JDBC connection user.";
-  private static final String CONNECTION_USER_DISPLAY = "JDBC User";
-
-  public static final String CONNECTION_PASSWORD_CONFIG = CONNECTION_PREFIX + "password";
-  private static final String CONNECTION_PASSWORD_DOC = "JDBC connection password.";
-  private static final String CONNECTION_PASSWORD_DISPLAY = "JDBC Password";
-
-  public static final String CONNECTION_ATTEMPTS_CONFIG = CONNECTION_PREFIX + "attempts";
-  public static final String CONNECTION_ATTEMPTS_DOC
-      = "Maximum number of attempts to retrieve a valid JDBC connection. "
-          + "Must be a positive integer.";
-  public static final String CONNECTION_ATTEMPTS_DISPLAY = "JDBC connection attempts";
-  public static final int CONNECTION_ATTEMPTS_DEFAULT = 3;
-
-  public static final String CONNECTION_BACKOFF_CONFIG = CONNECTION_PREFIX + "backoff.ms";
-  public static final String CONNECTION_BACKOFF_DOC
-      = "Backoff time in milliseconds between connection attempts.";
-  public static final String CONNECTION_BACKOFF_DISPLAY
-      = "JDBC connection backoff in milliseconds";
-  public static final long CONNECTION_BACKOFF_DEFAULT = 10000L;
 
   public static final String POLL_INTERVAL_MS_CONFIG = "poll.interval.ms";
   private static final String POLL_INTERVAL_MS_DOC = "Frequency in ms to poll for new data in "
@@ -144,16 +109,6 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
 
   private static final EnumRecommender NUMERIC_MAPPING_RECOMMENDER =
       EnumRecommender.in(NumericMapping.values());
-
-  public static final String DIALECT_NAME_CONFIG = "dialect.name";
-  private static final String DIALECT_NAME_DISPLAY = "Database Dialect";
-  public static final String DIALECT_NAME_DEFAULT = "";
-  private static final String DIALECT_NAME_DOC =
-      "The name of the database dialect that should be used for this connector. By default this "
-      + "is empty, and the connector automatically determines the dialect based upon the "
-      + "JDBC connection URL. Use this if you want to override that behavior and use a "
-      + "specific dialect. All properly-packaged dialects in the JDBC connector plugin "
-      + "can be used.";
 
   public static final String MODE_CONFIG = "mode";
   private static final String MODE_DOC =
@@ -298,20 +253,6 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
   public static final long TIMESTAMP_DELAY_INTERVAL_MS_DEFAULT = 0;
   private static final String TIMESTAMP_DELAY_INTERVAL_MS_DISPLAY = "Delay Interval (ms)";
 
-  public static final String DB_TIMEZONE_CONFIG = "db.timezone";
-  public static final String DB_TIMEZONE_DEFAULT = "UTC";
-  private static final String DB_TIMEZONE_CONFIG_DOC =
-      "Name of the JDBC timezone used in the connector when "
-      + "querying with time-based criteria. Defaults to UTC.";
-  private static final String DB_TIMEZONE_CONFIG_DISPLAY = "DB time zone";
-
-  public static final String QUOTE_SQL_IDENTIFIERS_CONFIG = "quote.sql.identifiers";
-  public static final String QUOTE_SQL_IDENTIFIERS_DEFAULT = QuoteMethod.ALWAYS.name().toString();
-  public static final String QUOTE_SQL_IDENTIFIERS_DOC =
-      "When to quote table names, column names, and other identifiers in SQL statements. "
-      + "For backward compatibility, the default is ``always``.";
-  public static final String QUOTE_SQL_IDENTIFIERS_DISPLAY = "Quote Identifiers";
-
   public static final String QUERY_SUFFIX_CONFIG = "query.suffix";
   public static final String QUERY_SUFFIX_DEFAULT = "";
   public static final String QUERY_SUFFIX_DOC = 
@@ -384,9 +325,7 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
     HashMap<String, ConfigValue> configValues = new HashMap<>();
     config.configValues().stream()
             .filter((configValue) ->
-                    configValue.name().equals(
-                            JdbcSourceConnectorConfig.TRANSACTION_ISOLATION_MODE_CONFIG
-                    )
+                    configValue.name().equals(TRANSACTION_ISOLATION_MODE_CONFIG)
             ).forEach(configValue -> configValues.putIfAbsent(configValue.name(), configValue));
 
     TransactionIsolationMode transactionIsolationMode =
@@ -395,7 +334,7 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
             );
     if (transactionIsolationMode == TransactionIsolationMode.SQL_SERVER_SNAPSHOT) {
       DatabaseDialect dialect;
-      final String dialectName = this.getString(JdbcSourceConnectorConfig.DIALECT_NAME_CONFIG);
+      final String dialectName = this.getString(DIALECT_NAME_CONFIG);
       if (dialectName != null && !dialectName.trim().isEmpty()) {
         dialect = DatabaseDialects.create(dialectName, this);
       } else {
@@ -1009,9 +948,9 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
     return NumericMapping.get(this);
   }
 
-  public TimeZone timeZone() {
-    String dbTimeZone = getString(JdbcSourceTaskConfig.DB_TIMEZONE_CONFIG);
-    return TimeZone.getTimeZone(ZoneId.of(dbTimeZone));
+  @Override
+  public String getContextName() {
+    return "source";
   }
 
   public static void main(String[] args) {

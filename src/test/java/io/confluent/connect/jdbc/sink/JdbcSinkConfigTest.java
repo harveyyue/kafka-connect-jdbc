@@ -47,7 +47,7 @@ public class JdbcSinkConfigTest {
 
   @Test(expected = ConfigException.class)
   public void shouldFailToCreateConfigWithoutConnectionUrl() {
-    props.remove(JdbcSinkConfig.CONNECTION_URL);
+    props.remove(JdbcSinkConfig.CONNECTION_URL_CONFIG);
     createConfig();
   }
 
