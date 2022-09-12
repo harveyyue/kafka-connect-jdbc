@@ -88,7 +88,7 @@ public interface RecordValidator {
               + "records with a non-null Struct value and non-null Struct schema, "
               + "but found record at (topic='%s',partition=%d,offset=%d,timestamp=%d) "
               + "with a %s value and %s value schema.",
-              config.connectorName(),
+              config.getConnectorName(),
               JdbcSinkConfig.DELETE_ENABLED,
               config.deleteEnabled,
               JdbcSinkConfig.PK_MODE,
@@ -118,7 +118,7 @@ public interface RecordValidator {
               + "records with a non-null key and non-null Struct or primitive key schema, "
               + "but found record at (topic='%s',partition=%d,offset=%d,timestamp=%d) "
               + "with a %s key and %s key schema.",
-              config.connectorName(),
+              config.getConnectorName(),
               JdbcSinkConfig.DELETE_ENABLED,
               config.deleteEnabled,
               JdbcSinkConfig.PK_MODE,

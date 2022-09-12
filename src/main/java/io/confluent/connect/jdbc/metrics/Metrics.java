@@ -50,14 +50,16 @@ public class Metrics {
 
   public Metrics(JdbcConfig jdbcConfig, String contextName) {
     String connectorType = jdbcConfig.getContextName();
-    String connectorName = jdbcConfig.connectorName();
-    this.name = metricName(connectorType, connectorName, contextName);
+    String connectorName = jdbcConfig.getConnectorName();
+    String taskId = jdbcConfig.getTaskId();
+    this.name = metricName(connectorType, connectorName, contextName, taskId);
   }
 
-  protected ObjectName metricName(String connectorType, String connectorName, String contextName) {
+  protected ObjectName metricName(String connectorType, String connectorName, String contextName, String taskId) {
     Map<String, String> tags = new LinkedHashMap<>();
     tags.put("context", contextName);
     tags.put("server", connectorName);
+    tags.put("task", taskId);
     return metricName(connectorType, tags);
   }
 

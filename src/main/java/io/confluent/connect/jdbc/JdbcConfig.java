@@ -84,15 +84,23 @@ public abstract class JdbcConfig extends AbstractConfig {
           + "For backward compatibility, the default is ``always``.";
   public static final String QUOTE_SQL_IDENTIFIERS_DISPLAY = "Quote Identifiers";
 
+  public static final String TASK_ID = "task.id";
+
   protected final String connectorName;
+  private final String taskId;
 
   public JdbcConfig(ConfigDef configDef, Map<?, ?> props) {
     super(configDef, props);
-    connectorName = ConfigUtils.connectorName(props);
+    this.connectorName = ConfigUtils.connectorName(props);
+    this.taskId = (String) props.get(TASK_ID);
   }
 
-  public String connectorName() {
-    return connectorName;
+  public String getConnectorName() {
+    return this.connectorName;
+  }
+
+  public String getTaskId() {
+    return this.taskId;
   }
 
   public TimeZone timeZone() {

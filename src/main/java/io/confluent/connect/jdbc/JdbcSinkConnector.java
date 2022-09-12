@@ -19,6 +19,7 @@ import static io.confluent.connect.jdbc.sink.JdbcSinkConfig.DELETE_ENABLED;
 import static io.confluent.connect.jdbc.sink.JdbcSinkConfig.PK_MODE;
 import static io.confluent.connect.jdbc.sink.JdbcSinkConfig.PrimaryKeyMode.RECORD_KEY;
 
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Optional;
 import org.apache.kafka.common.config.Config;
@@ -51,7 +52,9 @@ public class JdbcSinkConnector extends SinkConnector {
     log.info("Setting task configurations for {} workers.", maxTasks);
     final List<Map<String, String>> configs = new ArrayList<>(maxTasks);
     for (int i = 0; i < maxTasks; ++i) {
-      configs.add(configProps);
+      Map<String, String> taskProps = new HashMap<>(configProps);
+      taskProps.put(JdbcConfig.TASK_ID, String.valueOf(i));
+      configs.add(taskProps);
     }
     return configs;
   }
