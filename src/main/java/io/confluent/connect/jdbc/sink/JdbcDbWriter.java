@@ -15,6 +15,7 @@
 
 package io.confluent.connect.jdbc.sink;
 
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
 
@@ -27,6 +28,7 @@ import java.util.Map;
 import io.confluent.connect.jdbc.dialect.DatabaseDialect;
 import io.confluent.connect.jdbc.util.CachedConnectionProvider;
 import io.confluent.connect.jdbc.util.TableId;
+import io.confluent.connect.jdbc.util.TableShardDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +67,19 @@ public class JdbcDbWriter {
     try {
       final Map<TableId, BufferedRecords> bufferByTable = new HashMap<>();
       for (SinkRecord record : records) {
-        final TableId tableId = destinationTable(record.topic());
+        TableId tableId;
+        TableShardDefinition tableShardDefinition =
+            config.getTableShardDefinitions().get(record.topic());
+        if (tableShardDefinition != null) {
+          Object rawValue = ((Struct) record.value()).get(tableShardDefinition.getShardColumn());
+          if (rawValue == null) {
+            throw new ConnectException("Not specified shard column value in topic "
+                + record.topic());
+          }
+          tableId = destinationTable(tableShardDefinition, Long.valueOf(rawValue.toString()));
+        } else {
+          tableId = destinationTable(record.topic());
+        }
         BufferedRecords buffer = bufferByTable.get(tableId);
         if (buffer == null) {
           buffer = new BufferedRecords(config, tableId, dbDialect, dbStructure, connection);
@@ -97,6 +111,19 @@ public class JdbcDbWriter {
   }
 
   TableId destinationTable(String topic) {
+    final String tableName = config.tableNameFormat.replace("${topic}", topic);
+    if (tableName.isEmpty()) {
+      throw new ConnectException(String.format(
+          "Destination table name for topic '%s' is empty using the format string '%s'",
+          topic,
+          config.tableNameFormat
+      ));
+    }
+    return dbDialect.parseTableIdentifier(tableName);
+  }
+
+  TableId destinationTable(TableShardDefinition tableShardDefinition, long millis) {
+    String topic = tableShardDefinition.getShardTopicName(millis);
     final String tableName = config.tableNameFormat.replace("${topic}", topic);
     if (tableName.isEmpty()) {
       throw new ConnectException(String.format(

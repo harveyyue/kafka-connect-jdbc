@@ -72,4 +72,14 @@ public class StringUtils {
         return schema.type().getName();
     }
   }
+
+  /**
+   * Check if the string is blank (i.e. it's blank or only contains whitespace characters) or null.
+   *
+   * @param value the string to check
+   * @return {@code true} if the string is blank or null
+   */
+  public static boolean isBlank(String value) {
+    return value == null || value.trim().isEmpty();
+  }
 }

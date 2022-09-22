@@ -45,6 +45,7 @@ import org.slf4j.LoggerFactory;
 public class MySqlDatabaseDialect extends GenericDatabaseDialect {
 
   private final Logger log = LoggerFactory.getLogger(MySqlDatabaseDialect.class);
+  private static final String LENGTH_FIELD = "length";
 
   /**
    * The provider for {@link MySqlDatabaseDialect}.
@@ -132,7 +133,11 @@ public class MySqlDatabaseDialect extends GenericDatabaseDialect {
         case Decimal.LOGICAL_NAME:
           // Maximum precision supported by MySQL is 65
           int scale = Integer.parseInt(field.schemaParameters().get(Decimal.SCALE_FIELD));
-          return "DECIMAL(65," + scale + ")";
+          int length = 65;
+          if (field.schemaParameters().get(LENGTH_FIELD) != null) {
+            length = Integer.parseInt(field.schemaParameters().get(LENGTH_FIELD));
+          }
+          return String.format("DECIMAL(%d, %d)", length, scale);
         case Date.LOGICAL_NAME:
           return "DATE";
         case Time.LOGICAL_NAME:
@@ -159,6 +164,11 @@ public class MySqlDatabaseDialect extends GenericDatabaseDialect {
       case BOOLEAN:
         return "TINYINT";
       case STRING:
+        if (field.schemaParameters() != null
+            && field.schemaParameters().get(LENGTH_FIELD) != null) {
+          int length = Integer.parseInt(field.schemaParameters().get(LENGTH_FIELD));
+          return "VARCHAR(" + length + ")";
+        }
         return "TEXT";
       case BYTES:
         return "VARBINARY(1024)";
