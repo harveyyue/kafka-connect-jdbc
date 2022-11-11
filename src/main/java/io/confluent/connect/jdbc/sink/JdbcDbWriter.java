@@ -22,6 +22,7 @@ import org.apache.kafka.connect.sink.SinkRecord;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -75,6 +76,10 @@ public class JdbcDbWriter {
           if (rawValue == null) {
             throw new ConnectException("Not specified shard column value in topic "
                 + record.topic());
+          }
+          // raw value maybe come from connect class org.apache.kafka.connect.data.Timestamp
+          if (rawValue instanceof Date) {
+            rawValue = ((Date) rawValue).getTime();
           }
           tableId = destinationTable(tableShardDefinition, Long.valueOf(rawValue.toString()));
         } else {
