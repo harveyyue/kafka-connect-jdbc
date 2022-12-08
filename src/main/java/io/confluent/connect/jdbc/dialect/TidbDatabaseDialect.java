@@ -29,6 +29,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -101,6 +102,18 @@ public class TidbDatabaseDialect extends MySqlDatabaseDialect {
     }
     builder.append(")");
     return builder.toString();
+  }
+
+  @Override
+  public List<String> buildAlterTable(
+      TableId table,
+      Collection<SinkRecordField> fields
+  ) {
+    final List<String> queries = new ArrayList<>(fields.size());
+    for (SinkRecordField field : fields) {
+      queries.addAll(super.buildAlterTable(table, Collections.singleton(field)));
+    }
+    return queries;
   }
 
   @Override
