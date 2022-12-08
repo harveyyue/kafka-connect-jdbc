@@ -26,7 +26,11 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import io.confluent.connect.jdbc.dialect.DatabaseDialectProvider.SubprotocolBasedProvider;
 import io.confluent.connect.jdbc.sink.JdbcSinkConfig;
@@ -45,9 +49,15 @@ import org.slf4j.LoggerFactory;
 public class MySqlDatabaseDialect extends GenericDatabaseDialect {
 
   private final Logger log = LoggerFactory.getLogger(MySqlDatabaseDialect.class);
-  private static final String DATATYPE_FIELD = "datatype";
+  private static final String TYPE_FIELD = "datatype";
   private static final String LENGTH_FIELD = "length";
   private static final String SCALE_FIELD = "scale";
+  private static final String DEBEZIUM_SOURCE_COLUMN_TYPE = "__debezium.source.column.type";
+  private static final String DEBEZIUM_SOURCE_COLUMN_LENGTH = "__debezium.source.column.length";
+  private static final String DEBEZIUM_SOURCE_COLUMN_SCALE = "__debezium.source.column.scale";
+  private List<String> types;
+  private List<String> lengths;
+  private List<String> scales;
 
   /**
    * The provider for {@link MySqlDatabaseDialect}.
@@ -70,6 +80,9 @@ public class MySqlDatabaseDialect extends GenericDatabaseDialect {
    */
   public MySqlDatabaseDialect(AbstractConfig config) {
     super(config, new IdentifierRules(".", "`", "`"));
+    this.types = Arrays.asList(TYPE_FIELD, DEBEZIUM_SOURCE_COLUMN_TYPE);
+    this.lengths = Arrays.asList(LENGTH_FIELD, DEBEZIUM_SOURCE_COLUMN_LENGTH);
+    this.scales = Arrays.asList(SCALE_FIELD, DEBEZIUM_SOURCE_COLUMN_SCALE);
   }
 
   /**
@@ -134,11 +147,9 @@ public class MySqlDatabaseDialect extends GenericDatabaseDialect {
     Integer scale = null;
     String datatype = null;
     if (field.schemaParameters() != null) {
-      length = field.schemaParameters().get(LENGTH_FIELD) != null
-          ? Integer.parseInt(field.schemaParameters().get(LENGTH_FIELD)) : null;
-      scale = field.schemaParameters().get(SCALE_FIELD) != null
-          ? Integer.parseInt(field.schemaParameters().get(SCALE_FIELD)) : null;
-      datatype = field.schemaParameters().get(DATATYPE_FIELD);
+      length = getIntegerParameterValue(field, lengths);
+      scale = getIntegerParameterValue(field, scales);
+      datatype = getStringParameterValue(field, types);
     }
     if (field.schemaName() != null) {
       switch (field.schemaName()) {
@@ -177,8 +188,14 @@ public class MySqlDatabaseDialect extends GenericDatabaseDialect {
       case BOOLEAN:
         return "TINYINT";
       case STRING:
-        if (datatype != null && length != null) {
-          return String.format("%s(%d)", datatype, length);
+        if (datatype != null) {
+          if (datatype.equalsIgnoreCase("DECIMAL")
+              || datatype.equalsIgnoreCase("TIMESTAMP")) {
+            return "VARCHAR(255)";
+          }
+          if (length != null) {
+            return String.format("%s(%d)", datatype, length);
+          }
         }
         return "TEXT";
       case BYTES:
@@ -227,5 +244,28 @@ public class MySqlDatabaseDialect extends GenericDatabaseDialect {
     return super.sanitizedUrl(url)
                 .replaceAll("(?i)([(,]password=)[^,)]*", "$1****")
                 .replaceAll("(://[^:]*:)([^@]*)@", "$1****@");
+  }
+
+  private Integer getIntegerParameterValue(SinkRecordField field, List<String> parameters) {
+    List<String> values = getParameterValues(field, parameters);
+    if (values.size() > 0) {
+      return Integer.valueOf(values.stream().findFirst().get());
+    }
+    return null;
+  }
+
+  private String getStringParameterValue(SinkRecordField field, List<String> parameters) {
+    List<String> values = getParameterValues(field, parameters);
+    if (values.size() > 0) {
+      return values.stream().findFirst().get();
+    }
+    return null;
+  }
+
+  private List<String> getParameterValues(SinkRecordField field, List<String> parameters) {
+    return parameters.stream()
+        .map(param -> field.schemaParameters().get(param))
+        .filter(Objects::nonNull)
+        .collect(Collectors.toList());
   }
 }
