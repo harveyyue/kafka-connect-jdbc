@@ -586,4 +586,21 @@ public abstract class BaseDialectTest<T extends GenericDatabaseDialect> {
     dialect.bindField(statement, index, schema, value, colDef);
     return verify(statement, times(1));
   }
+
+  protected List<SinkRecordField> buildSinkRecordFieldsIncludingSchemaParameters() {
+    Map<String, String> parameters = new HashMap<>();
+    parameters.put("__debezium.source.column.type", "VARCHAR");
+    parameters.put("__debezium.source.column.length", "100");
+    Schema c3Schema = SchemaBuilder.string().parameters(parameters).build();
+    SinkRecordField c3SinkRecordField = new SinkRecordField(c3Schema, "c3", false);
+    List<SinkRecordField> sinkRecordFieldsIncludingSchemaParameters = new ArrayList<>();
+    sinkRecordFields.forEach(field -> {
+      if (field.name().equalsIgnoreCase("c3")) {
+        sinkRecordFieldsIncludingSchemaParameters.add(c3SinkRecordField);
+      } else{
+        sinkRecordFieldsIncludingSchemaParameters.add(field);
+      }
+    });
+    return sinkRecordFieldsIncludingSchemaParameters;
+  }
 }

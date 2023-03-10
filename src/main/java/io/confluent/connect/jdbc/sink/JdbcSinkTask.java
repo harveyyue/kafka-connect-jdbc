@@ -34,6 +34,7 @@ import io.confluent.connect.jdbc.dialect.DatabaseDialect;
 import io.confluent.connect.jdbc.dialect.DatabaseDialects;
 import io.confluent.connect.jdbc.metrics.JdbcSinkMetrics;
 import io.confluent.connect.jdbc.util.Clock;
+import io.confluent.connect.jdbc.util.StringUtils;
 import io.confluent.connect.jdbc.util.Version;
 
 public class JdbcSinkTask extends SinkTask {
@@ -143,21 +144,28 @@ public class JdbcSinkTask extends SinkTask {
         reporter.report(record, tace);
         writer.closeQuietly();
       } catch (SQLException sqle) {
-        SQLException sqlAllMessagesException = getAllMessagesException(sqle);
+        SQLException sqlAllMessagesException = getAllMessagesException(sqle, record.topic());
         reporter.report(record, sqlAllMessagesException);
         writer.closeQuietly();
       }
     }
   }
 
-  private SQLException getAllMessagesException(SQLException sqle) {
+  private SQLException getAllMessagesException(SQLException sqle, String topic) {
     String sqleAllMessages = "Exception chain:" + System.lineSeparator();
+    if (!StringUtils.isBlank(topic)) {
+      sqleAllMessages += "sink failed from topic " + topic + System.lineSeparator();
+    }
     for (Throwable e : sqle) {
       sqleAllMessages += e + System.lineSeparator();
     }
     SQLException sqlAllMessagesException = new SQLException(sqleAllMessages);
     sqlAllMessagesException.setNextException(sqle);
     return sqlAllMessagesException;
+  }
+
+  private SQLException getAllMessagesException(SQLException sqle) {
+    return getAllMessagesException(sqle, null);
   }
 
   @Override
