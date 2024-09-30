@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -219,6 +220,14 @@ public class JdbcSinkConfig extends JdbcConfig {
       + "    Extract the shard value from it, only support unix timestamp, like 1663672374501.\n"
       + " ``shard_mode`` \n"
       + "    Specify the shard mode, like year, month, day, hour";
+
+  public static final String TABLE_ID_MAPPING_CONFIG = "table.id.mapping";
+  private static final String TABLE_ID_MAPPING_DISPLAY = "Table id mapping";
+  private static final String TABLE_ID_MAPPING_DEFAULT = "";
+  private static final String TABLE_ID_MAPPING_DOC =
+      "Mapping the table id from parsing topic name to specified name, "
+      + "the value like: topic_database.topic_table:specified_database.specified_table,"
+      + "topic_database_2.topic_table_2:specified_database_2.specified_table_2";
 
   private static final EnumRecommender QUOTE_METHOD_RECOMMENDER =
       EnumRecommender.in(QuoteMethod.values());
@@ -455,6 +464,17 @@ public class JdbcSinkConfig extends JdbcConfig {
             ConfigDef.Width.MEDIUM,
             TABLE_SHARD_MAPPING_DISPLAY
         )
+        .define(
+            TABLE_ID_MAPPING_CONFIG,
+            ConfigDef.Type.STRING,
+            TABLE_ID_MAPPING_DEFAULT,
+            ConfigDef.Importance.MEDIUM,
+            TABLE_ID_MAPPING_DOC,
+            DDL_GROUP,
+            5,
+            ConfigDef.Width.MEDIUM,
+            TABLE_ID_MAPPING_DISPLAY
+        )
         // Retries
         .define(
             MAX_RETRIES,
@@ -502,6 +522,7 @@ public class JdbcSinkConfig extends JdbcConfig {
   public final EnumSet<TableType> tableTypes;
   public final TopicNamingMode topicNamingMode;
   public final Map<String, TableShardDefinition> tableShardDefinitions;
+  public final Map<String, String> rawTableIdMapping;
 
   public JdbcSinkConfig(Map<?, ?> props) {
     super(CONFIG_DEF, props);
@@ -532,6 +553,22 @@ public class JdbcSinkConfig extends JdbcConfig {
     tableTypes = TableType.parse(getList(TABLE_TYPES_CONFIG));
     topicNamingMode = TopicNamingMode.valueOf(getString(TOPIC_NAMING_MODE_CONFIG).toUpperCase());
     tableShardDefinitions = TableShardDefinition.parse(getString(TABLE_SHARD_MAPPING_CONFIG));
+    rawTableIdMapping = parseRawTableIdMapping();
+  }
+
+  private Map<String, String> parseRawTableIdMapping() {
+    Map<String, String> rawTableIdMapping = new HashMap<>();
+    String raw = getString(TABLE_ID_MAPPING_CONFIG);
+    if (StringUtils.isBlank(raw)) {
+      return rawTableIdMapping;
+    }
+    for (String mapping : raw.split(",")) {
+      String[] items = mapping.trim().split(":");
+      if (items.length == 2) {
+        rawTableIdMapping.put(items[0].trim(), items[1].trim());
+      }
+    }
+    return rawTableIdMapping;
   }
 
   private String getPasswordValue(String key) {
@@ -548,10 +585,6 @@ public class JdbcSinkConfig extends JdbcConfig {
 
   public Set<String> tableTypeNames() {
     return tableTypes().stream().map(TableType::toString).collect(Collectors.toSet());
-  }
-
-  public Map<String, TableShardDefinition> getTableShardDefinitions() {
-    return tableShardDefinitions;
   }
 
   @Override

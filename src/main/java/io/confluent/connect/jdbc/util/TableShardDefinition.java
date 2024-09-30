@@ -27,9 +27,9 @@ import java.util.TimeZone;
 import java.util.stream.Collectors;
 
 public class TableShardDefinition {
-  private String topicName;
-  private String shardColumn;
-  private TableShardMode shardMode;
+  private final String topicName;
+  private final String shardColumn;
+  private final TableShardMode shardMode;
 
   public TableShardDefinition(String topicName, String shardColumn, TableShardMode shardMode) {
     this.topicName = topicName;
@@ -62,8 +62,8 @@ public class TableShardDefinition {
     List<String[]> topicModes = Arrays.stream(modes)
         .map(m -> m.trim().split(":"))
         .collect(Collectors.toList());
-    if (topicModes.stream().filter(f -> f.length != 3
-        || Arrays.stream(f).filter(StringUtils::isBlank).count() > 0).count() > 0) {
+    if (topicModes.stream()
+            .anyMatch(f -> f.length != 3 || Arrays.stream(f).anyMatch(StringUtils::isBlank))) {
       throw new ConnectException("Couldn't start JdbcSinkConnector due to configuration error: "
           + JdbcSinkConfig.TABLE_SHARD_MAPPING_CONFIG + " value is invalid");
     }
@@ -81,7 +81,7 @@ public class TableShardDefinition {
     DAY("yyyyMMdd"),
     HOUR("yyyyMMddHH");
 
-    private String format;
+    private final String format;
 
     TableShardMode(String format) {
       this.format = format;

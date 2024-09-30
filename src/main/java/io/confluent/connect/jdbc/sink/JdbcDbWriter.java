@@ -40,6 +40,8 @@ public class JdbcDbWriter {
   private final DatabaseDialect dbDialect;
   private final DbStructure dbStructure;
   final CachedConnectionProvider cachedConnectionProvider;
+  final Map<TableId, TableId> tableIdMapping = new HashMap<>();
+  final Map<String, TableId> topicToTableIdCache = new HashMap<>();
 
   JdbcDbWriter(final JdbcSinkConfig config, DatabaseDialect dbDialect, DbStructure dbStructure) {
     this.config = config;
@@ -50,6 +52,9 @@ public class JdbcDbWriter {
         config.connectionAttempts,
         config.connectionBackoffMs
     );
+    config.rawTableIdMapping.forEach((k, v) ->
+            tableIdMapping.put(
+                    dbDialect.parseTableIdentifier(k), dbDialect.parseTableIdentifier(v)));
   }
 
   protected CachedConnectionProvider connectionProvider(int maxConnAttempts, long retryBackoff) {
@@ -70,7 +75,7 @@ public class JdbcDbWriter {
       for (SinkRecord record : records) {
         TableId tableId;
         TableShardDefinition tableShardDefinition =
-            config.getTableShardDefinitions().get(record.topic());
+                config.tableShardDefinitions.get(record.topic());
         if (tableShardDefinition != null) {
           Object rawValue = ((Struct) record.value()).get(tableShardDefinition.getShardColumn());
           if (rawValue == null) {
@@ -81,9 +86,16 @@ public class JdbcDbWriter {
           if (rawValue instanceof Date) {
             rawValue = ((Date) rawValue).getTime();
           }
-          tableId = destinationTable(tableShardDefinition, Long.valueOf(rawValue.toString()));
+          tableId = destinationTable(tableShardDefinition, Long.parseLong(rawValue.toString()));
         } else {
-          tableId = destinationTable(record.topic());
+          // non-table shard mode
+          tableId = topicToTableIdCache.computeIfAbsent(record.topic(), topic -> {
+            TableId currentTableId = destinationTable(topic);
+            if (tableIdMapping.get(currentTableId) != null) {
+              return tableIdMapping.get(currentTableId);
+            }
+            return currentTableId;
+          });
         }
         BufferedRecords buffer = bufferByTable.get(tableId);
         if (buffer == null) {
