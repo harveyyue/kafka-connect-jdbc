@@ -142,7 +142,12 @@ public class PreparedStatementBinder implements StatementBinder {
         } else {
           for (String fieldName : fieldsMetadata.keyFieldNames) {
             final Field field = schemaPair.keySchema.field(fieldName);
-            bindField(index++, field.schema(), ((Struct) record.key()).get(field), fieldName);
+            Object value = ((Struct) record.key()).get(field);
+            // try to pick up pk from record value struct if not available in record key
+            if (value == null) {
+              value = ((Struct) record.value()).get(fieldName);
+            }
+            bindField(index++, field.schema(), value, fieldName);
           }
         }
       }
