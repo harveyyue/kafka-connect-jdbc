@@ -29,6 +29,7 @@ import java.sql.SQLException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import io.confluent.connect.jdbc.dialect.DatabaseDialect;
 import io.confluent.connect.jdbc.dialect.DatabaseDialects;
@@ -52,6 +53,9 @@ public class JdbcSinkTask extends SinkTask {
   public void start(final Map<String, String> props) {
     log.info("Starting JDBC Sink task");
     config = new JdbcSinkConfig(props);
+    if (!config.topicsExcludeList.isEmpty()) {
+      log.info("Excluding topics: {}", config.topicsExcludeList);
+    }
     initWriter();
     remainingRetries = config.maxRetries;
     try {
@@ -77,6 +81,11 @@ public class JdbcSinkTask extends SinkTask {
 
   @Override
   public void put(Collection<SinkRecord> records) {
+    if (!config.topicsExcludeList.isEmpty()) {
+      records = records.stream()
+              .filter(record -> !config.topicsExcludeList.contains(record.topic()))
+              .collect(Collectors.toList());
+    }
     if (records.isEmpty()) {
       return;
     }

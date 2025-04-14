@@ -229,6 +229,12 @@ public class JdbcSinkConfig extends JdbcConfig {
       + "the value like: topic_database.topic_table:specified_database.specified_table,"
       + "topic_database_2.topic_table_2:specified_database_2.specified_table_2";
 
+  public static final String TOPICS_EXCLUDE_LIST_CONFIG = "topics.exclude.list";
+  private static final String TOPICS_EXCLUDE_LIST_DISPLAY = "Topics exclude list";
+  private static final String TOPICS_EXCLUDE_LIST_DEFAULT = "";
+  private static final String TOPICS_EXCLUDE_LIST_DOC =
+      "Excluding the list of topics that are specified by the topic name with comma separated";
+
   private static final EnumRecommender QUOTE_METHOD_RECOMMENDER =
       EnumRecommender.in(QuoteMethod.values());
 
@@ -475,6 +481,17 @@ public class JdbcSinkConfig extends JdbcConfig {
             ConfigDef.Width.MEDIUM,
             TABLE_ID_MAPPING_DISPLAY
         )
+        .define(
+            TOPICS_EXCLUDE_LIST_CONFIG,
+            ConfigDef.Type.LIST,
+            TOPICS_EXCLUDE_LIST_DEFAULT,
+            ConfigDef.Importance.MEDIUM,
+            TOPICS_EXCLUDE_LIST_DOC,
+            DDL_GROUP,
+            5,
+            ConfigDef.Width.MEDIUM,
+            TOPICS_EXCLUDE_LIST_DISPLAY
+          )
         // Retries
         .define(
             MAX_RETRIES,
@@ -523,6 +540,7 @@ public class JdbcSinkConfig extends JdbcConfig {
   public final TopicNamingMode topicNamingMode;
   public final Map<String, TableShardDefinition> tableShardDefinitions;
   public final Map<String, String> rawTableIdMapping;
+  public final List<String> topicsExcludeList;
 
   public JdbcSinkConfig(Map<?, ?> props) {
     super(CONFIG_DEF, props);
@@ -554,6 +572,7 @@ public class JdbcSinkConfig extends JdbcConfig {
     topicNamingMode = TopicNamingMode.valueOf(getString(TOPIC_NAMING_MODE_CONFIG).toUpperCase());
     tableShardDefinitions = TableShardDefinition.parse(getString(TABLE_SHARD_MAPPING_CONFIG));
     rawTableIdMapping = parseRawTableIdMapping();
+    topicsExcludeList = getList(TOPICS_EXCLUDE_LIST_CONFIG);
   }
 
   private Map<String, String> parseRawTableIdMapping() {
