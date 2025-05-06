@@ -26,9 +26,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import io.confluent.connect.jdbc.JdbcConfig;
+import io.confluent.connect.jdbc.sink.metadata.UdfField;
 import io.confluent.connect.jdbc.util.DatabaseDialectRecommender;
 import io.confluent.connect.jdbc.util.DeleteEnabledRecommender;
 import io.confluent.connect.jdbc.util.EnumRecommender;
@@ -234,6 +237,13 @@ public class JdbcSinkConfig extends JdbcConfig {
   private static final String TOPICS_EXCLUDE_LIST_DEFAULT = "";
   private static final String TOPICS_EXCLUDE_LIST_DOC =
       "Excluding the list of topics that are specified by the topic name with comma separated";
+
+  public static final String UDF_COLUMN_LIST_CONFIG = "udf.column.list";
+  private static final String UDF_COLUMN_LIST_DISPLAY = "Udf column list";
+  private static final String UDF_COLUMN_LIST_DEFAULT = "";
+  private static final String UDF_COLUMN_LIST_DOC =
+      "The user define function column, like `table_name:column_name:function_name:return_type`, "
+      + "and the delimiter is '|' when multiple mapping configs";
 
   private static final EnumRecommender QUOTE_METHOD_RECOMMENDER =
       EnumRecommender.in(QuoteMethod.values());
@@ -492,6 +502,17 @@ public class JdbcSinkConfig extends JdbcConfig {
             ConfigDef.Width.MEDIUM,
             TOPICS_EXCLUDE_LIST_DISPLAY
           )
+        .define(
+            UDF_COLUMN_LIST_CONFIG,
+            ConfigDef.Type.STRING,
+            UDF_COLUMN_LIST_DEFAULT,
+            ConfigDef.Importance.MEDIUM,
+            UDF_COLUMN_LIST_DOC,
+            DDL_GROUP,
+            5,
+            ConfigDef.Width.MEDIUM,
+            UDF_COLUMN_LIST_DISPLAY
+          )
         // Retries
         .define(
             MAX_RETRIES,
@@ -518,6 +539,7 @@ public class JdbcSinkConfig extends JdbcConfig {
             RETRY_BACKOFF_MS_DISPLAY
         );
 
+  public static final Pattern UDF_PATTERN = Pattern.compile("(.*):(.*):(.*\\(.*\\)):(.*)");
   public final String connectionUrl;
   public final String connectionUser;
   public final String connectionPassword;
@@ -541,6 +563,7 @@ public class JdbcSinkConfig extends JdbcConfig {
   public final Map<String, TableShardDefinition> tableShardDefinitions;
   public final Map<String, String> rawTableIdMapping;
   public final List<String> topicsExcludeList;
+  public final List<UdfField> udfColumnList;
 
   public JdbcSinkConfig(Map<?, ?> props) {
     super(CONFIG_DEF, props);
@@ -573,6 +596,7 @@ public class JdbcSinkConfig extends JdbcConfig {
     tableShardDefinitions = TableShardDefinition.parse(getString(TABLE_SHARD_MAPPING_CONFIG));
     rawTableIdMapping = parseRawTableIdMapping();
     topicsExcludeList = getList(TOPICS_EXCLUDE_LIST_CONFIG);
+    udfColumnList = parseUdfColumnList();
   }
 
   private Map<String, String> parseRawTableIdMapping() {
@@ -588,6 +612,26 @@ public class JdbcSinkConfig extends JdbcConfig {
       }
     }
     return rawTableIdMapping;
+  }
+
+  private List<UdfField> parseUdfColumnList() {
+    List<UdfField> udfColumnList = new ArrayList<>();
+    String raw = getString(UDF_COLUMN_LIST_CONFIG);
+    if (StringUtils.isBlank(raw)) {
+      return udfColumnList;
+    }
+    for (String udf : raw.split("\\|")) {
+      Matcher matcher = UDF_PATTERN.matcher(udf);
+      if (matcher.matches()) {
+        UdfField udfField = new UdfField(
+            matcher.group(1).trim(),
+            matcher.group(2).trim(),
+            matcher.group(3).trim(),
+            matcher.group(4).trim());
+        udfColumnList.add(udfField);
+      }
+    }
+    return udfColumnList;
   }
 
   private String getPasswordValue(String key) {

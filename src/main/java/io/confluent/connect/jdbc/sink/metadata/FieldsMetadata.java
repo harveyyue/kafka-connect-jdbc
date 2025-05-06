@@ -28,6 +28,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import io.confluent.connect.jdbc.sink.JdbcSinkConfig;
 
@@ -36,6 +37,7 @@ public class FieldsMetadata {
   public final Set<String> keyFieldNames;
   public final Set<String> nonKeyFieldNames;
   public final Map<String, SinkRecordField> allFields;
+  public final List<UdfField> udfFields;
 
   // visible for testing
   public FieldsMetadata(
@@ -43,18 +45,32 @@ public class FieldsMetadata {
       Set<String> nonKeyFieldNames,
       Map<String, SinkRecordField> allFields
   ) {
+    this(keyFieldNames, nonKeyFieldNames, allFields, Collections.emptyList());
+  }
+
+  public FieldsMetadata(
+      Set<String> keyFieldNames,
+      Set<String> nonKeyFieldNames,
+      Map<String, SinkRecordField> allFields,
+      List<UdfField> udfFields
+  ) {
     boolean fieldCountsMatch = (keyFieldNames.size() + nonKeyFieldNames.size() == allFields.size());
+    Set<String> udfFieldNames = udfFields.stream()
+        .map(UdfField::column)
+        .collect(Collectors.toSet());
     boolean allFieldsContained = (allFields.keySet().containsAll(keyFieldNames)
-                   && allFields.keySet().containsAll(nonKeyFieldNames));
+                   && allFields.keySet().containsAll(nonKeyFieldNames)
+                   && allFields.keySet().containsAll(udfFieldNames));
     if (!fieldCountsMatch || !allFieldsContained) {
       throw new IllegalArgumentException(String.format(
-          "Validation fail -- keyFieldNames:%s nonKeyFieldNames:%s allFields:%s",
-          keyFieldNames, nonKeyFieldNames, allFields
+          "Validation fail -- keyFieldNames:%s nonKeyFieldNames:%s allFields:%s udfFields:%s",
+          keyFieldNames, nonKeyFieldNames, allFields, udfFieldNames
       ));
     }
     this.keyFieldNames = keyFieldNames;
     this.nonKeyFieldNames = nonKeyFieldNames;
     this.allFields = allFields;
+    this.udfFields = udfFields;
   }
 
   public static FieldsMetadata extract(
@@ -62,7 +78,8 @@ public class FieldsMetadata {
       final JdbcSinkConfig.PrimaryKeyMode pkMode,
       final List<String> configuredPkFields,
       final Set<String> fieldsWhitelist,
-      final SchemaPair schemaPair
+      final SchemaPair schemaPair,
+      final List<UdfField> udfFields
   ) {
     return extract(
         tableName,
@@ -70,7 +87,8 @@ public class FieldsMetadata {
         configuredPkFields,
         fieldsWhitelist,
         schemaPair.keySchema,
-        schemaPair.valueSchema
+        schemaPair.valueSchema,
+        udfFields
     );
   }
 
@@ -80,7 +98,8 @@ public class FieldsMetadata {
       final List<String> configuredPkFields,
       final Set<String> fieldsWhitelist,
       final Schema keySchema,
-      final Schema valueSchema
+      final Schema valueSchema,
+      final List<UdfField> udfFields
   ) {
     if (valueSchema != null && valueSchema.type() != Schema.Type.STRUCT) {
       throw new ConnectException("Value schema must be of type Struct");
@@ -126,6 +145,15 @@ public class FieldsMetadata {
       }
     }
 
+    for (UdfField udfField : udfFields) {
+      if (nonKeyFieldNames.contains(udfField.column())) {
+        continue;
+      }
+      nonKeyFieldNames.add(udfField.column());
+      allFields.put(udfField.column(),
+          new SinkRecordField(udfField.schema(), udfField.column(), false));
+    }
+
     if (allFields.isEmpty()) {
       throw new ConnectException(
           "No fields found using key and value schemas for table: " + tableName
@@ -158,7 +186,7 @@ public class FieldsMetadata {
       }
     }
 
-    return new FieldsMetadata(keyFieldNames, nonKeyFieldNames, allFieldsOrdered);
+    return new FieldsMetadata(keyFieldNames, nonKeyFieldNames, allFieldsOrdered, udfFields);
   }
 
   private static void extractKafkaPk(

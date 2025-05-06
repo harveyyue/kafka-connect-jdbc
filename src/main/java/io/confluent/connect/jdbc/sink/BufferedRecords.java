@@ -36,6 +36,7 @@ import io.confluent.connect.jdbc.dialect.DatabaseDialect;
 import io.confluent.connect.jdbc.dialect.DatabaseDialect.StatementBinder;
 import io.confluent.connect.jdbc.sink.metadata.FieldsMetadata;
 import io.confluent.connect.jdbc.sink.metadata.SchemaPair;
+import io.confluent.connect.jdbc.sink.metadata.UdfField;
 import io.confluent.connect.jdbc.util.ColumnId;
 import io.confluent.connect.jdbc.util.TableId;
 
@@ -112,12 +113,20 @@ public class BufferedRecords {
           record.keySchema(),
           record.valueSchema()
       );
+      // Add current table's udf columns if needed
+      List<UdfField> tableUdfFields = config.udfColumnList.stream()
+          .filter(udfField -> udfField.table().equalsIgnoreCase(tableId.tableName()))
+          .collect(Collectors.toList());
+      if (!tableUdfFields.isEmpty()) {
+        log.info("Table {} udf columns: {}", tableId.tableName(), tableUdfFields);
+      }
       fieldsMetadata = FieldsMetadata.extract(
           tableId.tableName(),
           config.pkMode,
           config.pkFields,
           config.fieldsWhitelist,
-          schemaPair
+          schemaPair,
+          tableUdfFields
       );
       dbStructure.createOrAmendIfNecessary(
           config,

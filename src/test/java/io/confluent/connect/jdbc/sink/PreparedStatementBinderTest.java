@@ -15,6 +15,7 @@
 
 package io.confluent.connect.jdbc.sink;
 
+import io.confluent.connect.jdbc.sink.metadata.UdfField;
 import io.confluent.connect.jdbc.util.ColumnDefinition;
 import io.confluent.connect.jdbc.util.ColumnId;
 import io.confluent.connect.jdbc.util.TableDefinition;
@@ -117,7 +118,10 @@ public class PreparedStatementBinderTest {
 
     List<String> pkFields = Collections.singletonList("long");
 
-    FieldsMetadata fieldsMetadata = FieldsMetadata.extract("people", pkMode, pkFields, Collections.<String>emptySet(), schemaPair);
+    List<UdfField> udfFields = new ArrayList<>();
+    udfFields.add(new UdfField("people", "datetime", "date(0,'yyyy-MM-dd HH:mm:ss')", "string"));
+    udfFields.add(new UdfField("people","dt", "date()", "string"));
+    FieldsMetadata fieldsMetadata = FieldsMetadata.extract("people", pkMode, pkFields, Collections.emptySet(), schemaPair, udfFields);
 
     PreparedStatement statement = mock(PreparedStatement.class);
     TableId tabId = new TableId("ORCL", "ADMIN", "people");
@@ -231,7 +235,7 @@ public class PreparedStatementBinderTest {
 
       List<String> pkFields = Collections.singletonList("long");
 
-      FieldsMetadata fieldsMetadata = FieldsMetadata.extract("people", pkMode, pkFields, Collections.<String>emptySet(), schemaPair);
+      FieldsMetadata fieldsMetadata = FieldsMetadata.extract("people", pkMode, pkFields, Collections.<String>emptySet(), schemaPair, Collections.emptyList());
 
       PreparedStatement statement = mock(PreparedStatement.class);
       TableId tabId = new TableId("ORCL", "ADMIN", "people");
@@ -282,7 +286,7 @@ public class PreparedStatementBinderTest {
       List<String> pkFields = Collections.singletonList("long");
 
       FieldsMetadata fieldsMetadata = FieldsMetadata.extract("people", pkMode, pkFields,
-              Collections.<String>emptySet(), schemaPair);
+              Collections.<String>emptySet(), schemaPair, Collections.emptyList());
 
       PreparedStatement statement = mock(PreparedStatement.class);
       TableId tabId = new TableId("ORCL", "ADMIN", "people");
