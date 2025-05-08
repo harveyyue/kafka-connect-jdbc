@@ -213,6 +213,18 @@ public class MySqlDatabaseDialectTest extends BaseDialectTest<MySqlDatabaseDiale
   }
 
   @Test
+  public void upsertIgnore() {
+    TableId actor = tableId("actor");
+    String expected = "insert ignore into `actor`(`actor_id`,`first_name`,`last_name`,`score`) " +
+        "values(?,?,?,?) on duplicate key update `first_name`=values(`first_name`)," +
+        "`last_name`=values(`last_name`),`score`=values(`score`)";
+    String sql = dialect.buildUpsertIgnoreQueryStatement(actor, columns(actor, "actor_id"),
+        columns(actor, "first_name", "last_name",
+            "score"), null);
+    assertEquals(expected, sql);
+  }
+
+  @Test
   public void upsertOnlyKeyCols() {
     TableId actor = tableId("actor");
     String expected = "insert into `actor`(`actor_id`) " +
@@ -228,6 +240,15 @@ public class MySqlDatabaseDialectTest extends BaseDialectTest<MySqlDatabaseDiale
     String expected = "INSERT INTO `customers`(`age`,`firstName`,`lastName`) VALUES(?,?,?)";
     String sql = dialect.buildInsertStatement(customers, columns(customers),
                                               columns(customers, "age", "firstName", "lastName"));
+    assertEquals(expected, sql);
+  }
+
+  @Test
+  public void insertIgnore() {
+    TableId customers = tableId("customers");
+    String expected = "INSERT IGNORE INTO `customers`(`age`,`firstName`,`lastName`) VALUES(?,?,?)";
+    String sql = dialect.buildInsertIgnoreStatement(customers, columns(customers),
+        columns(customers, "age", "firstName", "lastName"), null);
     assertEquals(expected, sql);
   }
 

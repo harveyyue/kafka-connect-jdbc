@@ -49,7 +49,9 @@ public class JdbcSinkConfig extends JdbcConfig {
 
   public enum InsertMode {
     INSERT,
+    INSERT_IGNORE,
     UPSERT,
+    UPSERT_IGNORE,
     UPDATE;
 
   }
@@ -129,9 +131,13 @@ public class JdbcSinkConfig extends JdbcConfig {
       "The insertion mode to use. Supported modes are:\n"
       + "``insert``\n"
       + "    Use standard SQL ``INSERT`` statements.\n"
+      + "``insert_ignore``\n"
+      + "    Use standard SQL ``INSERT IGNORE`` statements.\n"
       + "``upsert``\n"
       + "    Use the appropriate upsert semantics for the target database if it is supported by "
       + "the connector, e.g. ``INSERT OR IGNORE``.\n"
+      + "``upsert_ignore``\n"
+      + "    Use the appropriate upsert ignore semantics for MySQL/TiDB. \n"
       + "``update``\n"
       + "    Use the appropriate update semantics for the target database if it is supported by "
       + "the connector, e.g. ``UPDATE``.";

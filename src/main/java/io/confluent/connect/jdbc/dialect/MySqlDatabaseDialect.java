@@ -39,6 +39,7 @@ import io.confluent.connect.jdbc.util.ColumnId;
 import io.confluent.connect.jdbc.util.ExpressionBuilder;
 import io.confluent.connect.jdbc.util.ExpressionBuilder.Transform;
 import io.confluent.connect.jdbc.util.IdentifierRules;
+import io.confluent.connect.jdbc.util.TableDefinition;
 import io.confluent.connect.jdbc.util.TableId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -203,6 +204,28 @@ public class MySqlDatabaseDialect extends GenericDatabaseDialect {
       default:
         return super.getSqlType(field);
     }
+  }
+
+  @Override
+  public String buildInsertIgnoreStatement(
+      TableId table,
+      Collection<ColumnId> keyColumns,
+      Collection<ColumnId> nonKeyColumns,
+      TableDefinition definition
+  ) {
+    String insert = super.buildInsertStatement(table, keyColumns, nonKeyColumns, definition);
+    return insert.replaceFirst("INSERT INTO", "INSERT IGNORE INTO");
+  }
+
+  @Override
+  public String buildUpsertIgnoreQueryStatement(
+      TableId table,
+      Collection<ColumnId> keyColumns,
+      Collection<ColumnId> nonKeyColumns,
+      TableDefinition definition
+  ) {
+    String upsert = buildUpsertQueryStatement(table, keyColumns, nonKeyColumns);
+    return upsert.replaceFirst("insert into", "insert ignore into");
   }
 
   @Override

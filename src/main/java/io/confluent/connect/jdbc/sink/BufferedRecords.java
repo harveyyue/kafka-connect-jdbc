@@ -248,6 +248,13 @@ public class BufferedRecords {
             asColumns(fieldsMetadata.nonKeyFieldNames),
             dbStructure.tableDefinition(connection, tableId)
         );
+      case INSERT_IGNORE:
+        return dbDialect.buildInsertIgnoreStatement(
+            tableId,
+            asColumns(fieldsMetadata.keyFieldNames),
+            asColumns(fieldsMetadata.nonKeyFieldNames),
+            dbStructure.tableDefinition(connection, tableId)
+        );
       case UPSERT:
         if (fieldsMetadata.keyFieldNames.isEmpty()) {
           throw new ConnectException(String.format(
@@ -266,6 +273,28 @@ public class BufferedRecords {
         } catch (UnsupportedOperationException e) {
           throw new ConnectException(String.format(
               "Write to table '%s' in UPSERT mode is not supported with the %s dialect.",
+              tableId,
+              dbDialect.name()
+          ));
+        }
+      case UPSERT_IGNORE:
+        if (fieldsMetadata.keyFieldNames.isEmpty()) {
+          throw new ConnectException(String.format(
+              "Write to table '%s' in UPSERT IGNORE mode requires key field names to be known,"
+                  + " check the primary key configuration",
+              tableId
+          ));
+        }
+        try {
+          return dbDialect.buildUpsertIgnoreQueryStatement(
+              tableId,
+              asColumns(fieldsMetadata.keyFieldNames),
+              asColumns(fieldsMetadata.nonKeyFieldNames),
+              dbStructure.tableDefinition(connection, tableId)
+          );
+        } catch (UnsupportedOperationException e) {
+          throw new ConnectException(String.format(
+              "Write to table '%s' in UPSERT IGNORE mode is not supported with the %s dialect.",
               tableId,
               dbDialect.name()
           ));

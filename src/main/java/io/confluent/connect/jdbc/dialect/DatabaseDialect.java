@@ -372,6 +372,29 @@ public interface DatabaseDialect extends ConnectionProvider {
   }
 
   /**
+   * Build the INSERT IGNORE prepared statement expression for the given table and its columns.
+   *
+   * <p>By implement this method calls
+   * {@link #buildInsertStatement(TableId, Collection, Collection)} to maintain backward
+   * compatibility with older versions. Subclasses that override this method do not need to
+   * override {@link #buildInsertStatement(TableId, Collection, Collection)}.
+   *
+   * @param table         the identifier of the table; may not be null
+   * @param keyColumns    the identifiers of the columns in the primary/unique key; may not be null
+   *                      but may be empty
+   * @param nonKeyColumns the identifiers of the other columns in the table; may not be null but may
+   *                      be empty
+   * @param definition    the table definition; may be null if unknown
+   * @return the INSERT statement; may not be null
+   */
+  String buildInsertIgnoreStatement(
+      TableId table,
+      Collection<ColumnId> keyColumns,
+      Collection<ColumnId> nonKeyColumns,
+      TableDefinition definition
+  );
+
+  /**
    * Build the UPDATE prepared statement expression for the given table and its columns. Variables
    * for each key column should also appear in the WHERE clause of the statement.
    *
@@ -475,6 +498,25 @@ public interface DatabaseDialect extends ConnectionProvider {
   ) {
     return buildUpsertQueryStatement(table, keyColumns, nonKeyColumns);
   }
+
+  /**
+   * Build the UPSERT IGNORE prepared statement expression for the given table and its columns.
+   *
+   * @param table         the identifier of the table; may not be null
+   * @param keyColumns    the identifiers of the columns in the primary/unique key; may not be null
+   *                      but may be empty
+   * @param nonKeyColumns the identifiers of the other columns in the table; may not be null but may
+   *                      be empty
+   * @param definition    the table definition; may be null if unknown
+   * @return the upsert/merge statement; may not be null
+   * @throws UnsupportedOperationException if the dialect does not support upserts
+   */
+  String buildUpsertIgnoreQueryStatement(
+      TableId table,
+      Collection<ColumnId> keyColumns,
+      Collection<ColumnId> nonKeyColumns,
+      TableDefinition definition
+  );
 
   /**
    * Build the DELETE prepared statement expression for the given table and its columns. Variables

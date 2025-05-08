@@ -100,7 +100,9 @@ public class PreparedStatementBinder implements StatementBinder {
     } else {
       switch (insertMode) {
         case INSERT:
+        case INSERT_IGNORE:
         case UPSERT:
+        case UPSERT_IGNORE:
           index = bindKeyFields(record, index);
           bindNonKeyFields(record, valueStruct, index);
           break;
