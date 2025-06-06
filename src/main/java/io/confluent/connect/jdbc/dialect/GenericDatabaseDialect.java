@@ -416,6 +416,13 @@ public class GenericDatabaseDialect implements DatabaseDialect {
     return new TableId(null, parts.get(0), parts.get(1));
   }
 
+  protected TableId debeziumTableId(TableId tableId) {
+    if (topicNamingMode == JdbcSinkConfig.TopicNamingMode.DEBEZIUM) {
+      return new TableId(tableId.schemaName(), null, tableId.tableName());
+    }
+    return tableId;
+  }
+
   /**
    * Return whether the database uses JDBC catalogs.
    *

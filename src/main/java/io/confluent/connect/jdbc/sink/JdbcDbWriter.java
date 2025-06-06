@@ -15,46 +15,33 @@
 
 package io.confluent.connect.jdbc.sink;
 
-import org.apache.kafka.connect.data.Struct;
-import org.apache.kafka.connect.errors.ConnectException;
+import io.confluent.connect.jdbc.dialect.DatabaseDialect;
+import io.confluent.connect.jdbc.util.CachedConnectionProvider;
+import io.confluent.connect.jdbc.util.TableId;
 import org.apache.kafka.connect.sink.SinkRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-import io.confluent.connect.jdbc.dialect.DatabaseDialect;
-import io.confluent.connect.jdbc.util.CachedConnectionProvider;
-import io.confluent.connect.jdbc.util.TableId;
-import io.confluent.connect.jdbc.util.TableShardDefinition;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-public class JdbcDbWriter {
+public class JdbcDbWriter extends AbstractDbWriter {
   private static final Logger log = LoggerFactory.getLogger(JdbcDbWriter.class);
 
-  private final JdbcSinkConfig config;
-  private final DatabaseDialect dbDialect;
   private final DbStructure dbStructure;
   final CachedConnectionProvider cachedConnectionProvider;
-  final Map<TableId, TableId> tableIdMapping = new HashMap<>();
-  final Map<String, TableId> topicToTableIdCache = new HashMap<>();
 
   JdbcDbWriter(final JdbcSinkConfig config, DatabaseDialect dbDialect, DbStructure dbStructure) {
-    this.config = config;
-    this.dbDialect = dbDialect;
+    super(config, dbDialect);
     this.dbStructure = dbStructure;
 
     this.cachedConnectionProvider = connectionProvider(
         config.connectionAttempts,
         config.connectionBackoffMs
     );
-    config.rawTableIdMapping.forEach((k, v) ->
-            tableIdMapping.put(
-                    dbDialect.parseTableIdentifier(k), dbDialect.parseTableIdentifier(v)));
   }
 
   protected CachedConnectionProvider connectionProvider(int maxConnAttempts, long retryBackoff) {
@@ -67,36 +54,14 @@ public class JdbcDbWriter {
     };
   }
 
-  void write(final Collection<SinkRecord> records)
+  @Override
+  public void write(final Collection<SinkRecord> records)
       throws SQLException, TableAlterOrCreateException {
     final Connection connection = cachedConnectionProvider.getConnection();
     try {
       final Map<TableId, BufferedRecords> bufferByTable = new HashMap<>();
       for (SinkRecord record : records) {
-        TableId tableId;
-        TableShardDefinition tableShardDefinition =
-                config.tableShardDefinitions.get(record.topic());
-        if (tableShardDefinition != null) {
-          Object rawValue = ((Struct) record.value()).get(tableShardDefinition.getShardColumn());
-          if (rawValue == null) {
-            throw new ConnectException("Not specified shard column value in topic "
-                + record.topic());
-          }
-          // raw value maybe come from connect class org.apache.kafka.connect.data.Timestamp
-          if (rawValue instanceof Date) {
-            rawValue = ((Date) rawValue).getTime();
-          }
-          tableId = destinationTable(tableShardDefinition, Long.parseLong(rawValue.toString()));
-        } else {
-          // non-table shard mode
-          tableId = topicToTableIdCache.computeIfAbsent(record.topic(), topic -> {
-            TableId currentTableId = destinationTable(topic);
-            if (tableIdMapping.get(currentTableId) != null) {
-              return tableIdMapping.get(currentTableId);
-            }
-            return currentTableId;
-          });
-        }
+        TableId tableId = getTableId(record);
         BufferedRecords buffer = bufferByTable.get(tableId);
         if (buffer == null) {
           buffer = new BufferedRecords(config, tableId, dbDialect, dbStructure, connection);
@@ -123,32 +88,8 @@ public class JdbcDbWriter {
     }
   }
 
-  void closeQuietly() {
+  @Override
+  public void closeQuietly() {
     cachedConnectionProvider.close();
-  }
-
-  TableId destinationTable(String topic) {
-    final String tableName = config.tableNameFormat.replace("${topic}", topic);
-    if (tableName.isEmpty()) {
-      throw new ConnectException(String.format(
-          "Destination table name for topic '%s' is empty using the format string '%s'",
-          topic,
-          config.tableNameFormat
-      ));
-    }
-    return dbDialect.parseTableIdentifier(tableName);
-  }
-
-  TableId destinationTable(TableShardDefinition tableShardDefinition, long millis) {
-    String topic = tableShardDefinition.getShardTopicName(millis);
-    final String tableName = config.tableNameFormat.replace("${topic}", topic);
-    if (tableName.isEmpty()) {
-      throw new ConnectException(String.format(
-          "Destination table name for topic '%s' is empty using the format string '%s'",
-          topic,
-          config.tableNameFormat
-      ));
-    }
-    return dbDialect.parseTableIdentifier(tableName);
   }
 }
