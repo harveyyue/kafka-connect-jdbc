@@ -53,8 +53,8 @@ public class JdbcDbWriter {
         config.connectionBackoffMs
     );
     config.rawTableIdMapping.forEach((k, v) ->
-            tableIdMapping.put(
-                    dbDialect.parseTableIdentifier(k), dbDialect.parseTableIdentifier(v)));
+        tableIdMapping.put(
+            dbDialect.parseTableIdentifier(k), dbDialect.parseTableIdentifier(v)));
   }
 
   protected CachedConnectionProvider connectionProvider(int maxConnAttempts, long retryBackoff) {
@@ -75,7 +75,7 @@ public class JdbcDbWriter {
       for (SinkRecord record : records) {
         TableId tableId;
         TableShardDefinition tableShardDefinition =
-                config.tableShardDefinitions.get(record.topic());
+            config.tableShardDefinitions.get(record.topic());
         if (tableShardDefinition != null) {
           Object rawValue = ((Struct) record.value()).get(tableShardDefinition.getShardColumn());
           if (rawValue == null) {
@@ -99,7 +99,7 @@ public class JdbcDbWriter {
         }
         BufferedRecords buffer = bufferByTable.get(tableId);
         if (buffer == null) {
-          buffer = new BufferedRecords(config, tableId, dbDialect, dbStructure, connection);
+          buffer = new JdbcBufferedRecords(config, tableId, dbDialect, dbStructure, connection);
           bufferByTable.put(tableId, buffer);
         }
         buffer.add(record);
