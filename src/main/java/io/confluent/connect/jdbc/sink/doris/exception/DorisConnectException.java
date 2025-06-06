@@ -13,17 +13,17 @@
  * specific language governing permissions and limitations under the License.
  */
 
-package io.confluent.connect.jdbc.sink;
+package io.confluent.connect.jdbc.sink.doris.exception;
 
-import org.apache.kafka.connect.sink.SinkRecord;
+import org.apache.kafka.connect.errors.ConnectException;
 
-import java.sql.SQLException;
-import java.util.List;
+public class DorisConnectException extends ConnectException {
 
-public interface BufferedRecords {
-  List<SinkRecord> add(SinkRecord record) throws SQLException, TableAlterOrCreateException;
+  public DorisConnectException(String message) {
+    super(message);
+  }
 
-  List<SinkRecord> flush() throws SQLException;
-
-  void close() throws SQLException;
+  public DorisConnectException(String message, Throwable cause) {
+    super(message, cause);
+  }
 }

@@ -155,7 +155,7 @@ public class GenericDatabaseDialect implements DatabaseDialect {
   private final Queue<Connection> connections = new ConcurrentLinkedQueue<>();
   private volatile JdbcDriverInfo jdbcDriverInfo;
   private final int batchMaxRows;
-  private final TimeZone timeZone;
+  protected final TimeZone timeZone;
   private final JdbcSourceConnectorConfig.TimestampGranularity tsGranularity;
   protected final JdbcSinkConfig.TopicNamingMode topicNamingMode;
 
@@ -414,6 +414,13 @@ public class GenericDatabaseDialect implements DatabaseDialect {
       return new TableId(parts.get(0), null, parts.get(1));
     }
     return new TableId(null, parts.get(0), parts.get(1));
+  }
+
+  protected TableId debeziumTableId(TableId tableId) {
+    if (topicNamingMode == JdbcSinkConfig.TopicNamingMode.DEBEZIUM) {
+      return new TableId(tableId.schemaName(), null, tableId.tableName());
+    }
+    return tableId;
   }
 
   /**

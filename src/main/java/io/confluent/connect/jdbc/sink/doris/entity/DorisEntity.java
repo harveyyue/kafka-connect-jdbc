@@ -13,17 +13,16 @@
  * specific language governing permissions and limitations under the License.
  */
 
-package io.confluent.connect.jdbc.sink;
+package io.confluent.connect.jdbc.sink.doris.entity;
 
-import org.apache.kafka.connect.sink.SinkRecord;
+import lombok.Data;
 
-import java.sql.SQLException;
-import java.util.List;
+import java.io.Serializable;
 
-public interface BufferedRecords {
-  List<SinkRecord> add(SinkRecord record) throws SQLException, TableAlterOrCreateException;
-
-  List<SinkRecord> flush() throws SQLException;
-
-  void close() throws SQLException;
+@Data
+public class DorisEntity<T> implements Serializable {
+  private String msg;
+  private int code;
+  private T data;
+  private int count;
 }

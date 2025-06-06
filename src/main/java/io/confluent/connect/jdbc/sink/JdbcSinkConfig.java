@@ -186,6 +186,16 @@ public class JdbcSinkConfig extends JdbcConfig {
       + " while this configuration is applicable for the other columns.";
   private static final String FIELDS_WHITELIST_DISPLAY = "Fields Whitelist";
 
+  public static final String FIELDS_BLACKLIST = "fields.blacklist";
+  private static final String FIELDS_BLACKLIST_DEFAULT = "";
+  private static final String FIELDS_BLACKLIST_DOC =
+      "List of comma-separated record value field names. If empty, all fields from the record "
+          + "value are utilized, otherwise used to filter out the non-desired fields.\n"
+          + "Note that ``" + PK_FIELDS + "`` is applied independently in the context of which field"
+          + "(s) form the primary key columns in the destination database,"
+          + " while this configuration is applicable for the other columns.";
+  private static final String FIELDS_BLACKLIST_DISPLAY = "Fields Blacklist";
+
   private static final ConfigDef.Range NON_NEGATIVE_INT_VALIDATOR = ConfigDef.Range.atLeast(0);
 
   private static final String CONNECTION_GROUP = "Connection";
@@ -250,6 +260,11 @@ public class JdbcSinkConfig extends JdbcConfig {
   private static final String UDF_COLUMN_LIST_DOC =
       "The user define function column, like `table_name:column_name:function_name:return_type`, "
       + "and the delimiter is '|' when multiple mapping configs";
+
+  public static final String DORIS_FE_PORT_CONFIG = "doris.fe.port";
+  private static final String DORIS_FE_PORT_DISPLAY = "Doris fe port";
+  private static final String DORIS_FE_PORT_DEFAULT = "8030";
+  private static final String DORIS_FE_PORT_DOC = "Specify the port for the doris fe";
 
   private static final EnumRecommender QUOTE_METHOD_RECOMMENDER =
       EnumRecommender.in(QuoteMethod.values());
@@ -420,6 +435,17 @@ public class JdbcSinkConfig extends JdbcConfig {
             4,
             ConfigDef.Width.LONG,
             FIELDS_WHITELIST_DISPLAY
+        )
+        .define(
+            FIELDS_BLACKLIST,
+            ConfigDef.Type.LIST,
+            FIELDS_BLACKLIST_DEFAULT,
+            ConfigDef.Importance.MEDIUM,
+            FIELDS_BLACKLIST_DOC,
+            DATAMAPPING_GROUP,
+            4,
+            ConfigDef.Width.LONG,
+            FIELDS_BLACKLIST_DISPLAY
         ).define(
           DB_TIMEZONE_CONFIG,
           ConfigDef.Type.STRING,
@@ -519,6 +545,17 @@ public class JdbcSinkConfig extends JdbcConfig {
             ConfigDef.Width.MEDIUM,
             UDF_COLUMN_LIST_DISPLAY
           )
+        .define(
+            DORIS_FE_PORT_CONFIG,
+            ConfigDef.Type.INT,
+            DORIS_FE_PORT_DEFAULT,
+            ConfigDef.Importance.MEDIUM,
+            DORIS_FE_PORT_DOC,
+            DDL_GROUP,
+            5,
+            ConfigDef.Width.MEDIUM,
+            DORIS_FE_PORT_DISPLAY
+        )
         // Retries
         .define(
             MAX_RETRIES,
@@ -562,6 +599,7 @@ public class JdbcSinkConfig extends JdbcConfig {
   public final PrimaryKeyMode pkMode;
   public final List<String> pkFields;
   public final Set<String> fieldsWhitelist;
+  public final Set<String> fieldsBlacklist;
   public final String dialectName;
   public final TimeZone timeZone;
   public final EnumSet<TableType> tableTypes;
@@ -570,6 +608,7 @@ public class JdbcSinkConfig extends JdbcConfig {
   public final Map<String, String> rawTableIdMapping;
   public final List<String> topicsExcludeList;
   public final List<UdfField> udfColumnList;
+  public final int dorisFePort;
 
   public JdbcSinkConfig(Map<?, ?> props) {
     super(CONFIG_DEF, props);
@@ -590,6 +629,7 @@ public class JdbcSinkConfig extends JdbcConfig {
     pkFields = getList(PK_FIELDS);
     dialectName = getString(DIALECT_NAME_CONFIG);
     fieldsWhitelist = new HashSet<>(getList(FIELDS_WHITELIST));
+    fieldsBlacklist = new HashSet<>(getList(FIELDS_BLACKLIST));
     String dbTimeZone = getString(DB_TIMEZONE_CONFIG);
     timeZone = TimeZone.getTimeZone(ZoneId.of(dbTimeZone));
 
@@ -603,6 +643,7 @@ public class JdbcSinkConfig extends JdbcConfig {
     rawTableIdMapping = parseRawTableIdMapping();
     topicsExcludeList = getList(TOPICS_EXCLUDE_LIST_CONFIG);
     udfColumnList = parseUdfColumnList();
+    dorisFePort = getInt(DORIS_FE_PORT_CONFIG);
   }
 
   private Map<String, String> parseRawTableIdMapping() {

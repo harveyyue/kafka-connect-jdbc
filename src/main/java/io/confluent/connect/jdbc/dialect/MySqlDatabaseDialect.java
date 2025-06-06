@@ -26,14 +26,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 import io.confluent.connect.jdbc.dialect.DatabaseDialectProvider.SubprotocolBasedProvider;
-import io.confluent.connect.jdbc.sink.JdbcSinkConfig;
 import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
 import io.confluent.connect.jdbc.util.ColumnId;
 import io.confluent.connect.jdbc.util.ExpressionBuilder;
@@ -50,15 +46,6 @@ import org.slf4j.LoggerFactory;
 public class MySqlDatabaseDialect extends GenericDatabaseDialect {
 
   private final Logger log = LoggerFactory.getLogger(MySqlDatabaseDialect.class);
-  private static final String TYPE_FIELD = "datatype";
-  private static final String LENGTH_FIELD = "length";
-  private static final String SCALE_FIELD = "scale";
-  private static final String DEBEZIUM_SOURCE_COLUMN_TYPE = "__debezium.source.column.type";
-  private static final String DEBEZIUM_SOURCE_COLUMN_LENGTH = "__debezium.source.column.length";
-  private static final String DEBEZIUM_SOURCE_COLUMN_SCALE = "__debezium.source.column.scale";
-  private List<String> types;
-  private List<String> lengths;
-  private List<String> scales;
 
   /**
    * The provider for {@link MySqlDatabaseDialect}.
@@ -81,9 +68,6 @@ public class MySqlDatabaseDialect extends GenericDatabaseDialect {
    */
   public MySqlDatabaseDialect(AbstractConfig config) {
     super(config, new IdentifierRules(".", "`", "`"));
-    this.types = Arrays.asList(TYPE_FIELD, DEBEZIUM_SOURCE_COLUMN_TYPE);
-    this.lengths = Arrays.asList(LENGTH_FIELD, DEBEZIUM_SOURCE_COLUMN_LENGTH);
-    this.scales = Arrays.asList(SCALE_FIELD, DEBEZIUM_SOURCE_COLUMN_SCALE);
   }
 
   /**
@@ -110,11 +94,7 @@ public class MySqlDatabaseDialect extends GenericDatabaseDialect {
   public TableId parseTableIdentifier(String fqn) {
     TableId tableId = super.parseTableIdentifier(fqn);
     // check topic naming mode
-    if (topicNamingMode == JdbcSinkConfig.TopicNamingMode.DEBEZIUM) {
-      return new TableId(tableId.schemaName(), null, tableId.tableName());
-    } else {
-      return tableId;
-    }
+    return debeziumTableId(tableId);
   }
 
   @Override
@@ -126,6 +106,7 @@ public class MySqlDatabaseDialect extends GenericDatabaseDialect {
     builder.append(" ");
     String sqlType = getSqlType(f);
     builder.append(sqlType);
+    // Mapping STRING to TEXT and always set null constraint for text in mysql
     if (f.defaultValue() != null && !f.schemaType().equals(Schema.Type.STRING)) {
       builder.append(" DEFAULT ");
       formatColumnValue(
@@ -144,22 +125,14 @@ public class MySqlDatabaseDialect extends GenericDatabaseDialect {
 
   @Override
   protected String getSqlType(SinkRecordField field) {
-    Integer length = null;
-    Integer scale = null;
-    String datatype = null;
-    if (field.schemaParameters() != null) {
-      length = getIntegerParameterValue(field, lengths);
-      scale = getIntegerParameterValue(field, scales);
-      datatype = getStringParameterValue(field, types);
-    }
+    Optional<Integer> lengthOpt = field.getSourceColumnSize();
+    Optional<Integer> scaleOpt = field.getSourceColumnPrecision();
     if (field.schemaName() != null) {
       switch (field.schemaName()) {
         case Decimal.LOGICAL_NAME:
           // Maximum precision supported by MySQL is 65
-          if (length == null) {
-            length = 65;
-          }
-          return String.format("DECIMAL(%d,%d)", length, scale);
+          Integer length = lengthOpt.orElse(65);
+          return String.format("DECIMAL(%d, %d)", length, scaleOpt.get());
         case Date.LOGICAL_NAME:
           return "DATE";
         case Time.LOGICAL_NAME:
@@ -182,20 +155,21 @@ public class MySqlDatabaseDialect extends GenericDatabaseDialect {
       case FLOAT32:
         return "FLOAT";
       case FLOAT64:
-        if (length != null && scale != null) {
-          return String.format("DOUBLE(%d,%d)", length, scale);
+        if (lengthOpt.isPresent() && scaleOpt.isPresent()) {
+          return String.format("DOUBLE(%d,%d)", lengthOpt.get(), scaleOpt.get());
         }
         return "DOUBLE";
       case BOOLEAN:
         return "TINYINT";
       case STRING:
-        if (datatype != null) {
-          if (datatype.equalsIgnoreCase("DECIMAL")
-              || datatype.equalsIgnoreCase("TIMESTAMP")) {
+        Optional<String> dataTypeOpt = field.getSourceColumnType();
+        if (dataTypeOpt.isPresent()) {
+          if (dataTypeOpt.get().equalsIgnoreCase("DECIMAL")
+              || dataTypeOpt.get().equalsIgnoreCase("TIMESTAMP")) {
             return "VARCHAR(255)";
           }
-          if (length != null) {
-            return String.format("%s(%d)", datatype, length);
+          if (lengthOpt.isPresent()) {
+            return String.format("%s(%d)", dataTypeOpt.get(), lengthOpt.get());
           }
         }
         return "TEXT";
@@ -267,28 +241,5 @@ public class MySqlDatabaseDialect extends GenericDatabaseDialect {
     return super.sanitizedUrl(url)
                 .replaceAll("(?i)([(,]password=)[^,)]*", "$1****")
                 .replaceAll("(://[^:]*:)([^@]*)@", "$1****@");
-  }
-
-  private Integer getIntegerParameterValue(SinkRecordField field, List<String> parameters) {
-    List<String> values = getParameterValues(field, parameters);
-    if (values.size() > 0) {
-      return Integer.valueOf(values.stream().findFirst().get());
-    }
-    return null;
-  }
-
-  private String getStringParameterValue(SinkRecordField field, List<String> parameters) {
-    List<String> values = getParameterValues(field, parameters);
-    if (values.size() > 0) {
-      return values.stream().findFirst().get();
-    }
-    return null;
-  }
-
-  private List<String> getParameterValues(SinkRecordField field, List<String> parameters) {
-    return parameters.stream()
-        .map(param -> field.schemaParameters().get(param))
-        .filter(Objects::nonNull)
-        .collect(Collectors.toList());
   }
 }

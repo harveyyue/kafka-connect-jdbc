@@ -78,6 +78,7 @@ public class FieldsMetadata {
       final JdbcSinkConfig.PrimaryKeyMode pkMode,
       final List<String> configuredPkFields,
       final Set<String> fieldsWhitelist,
+      final Set<String> fieldsBlacklist,
       final SchemaPair schemaPair,
       final Map<String, UdfField> udfFields
   ) {
@@ -86,6 +87,7 @@ public class FieldsMetadata {
         pkMode,
         configuredPkFields,
         fieldsWhitelist,
+        fieldsBlacklist,
         schemaPair.keySchema,
         schemaPair.valueSchema,
         udfFields
@@ -97,6 +99,7 @@ public class FieldsMetadata {
       final JdbcSinkConfig.PrimaryKeyMode pkMode,
       final List<String> configuredPkFields,
       final Set<String> fieldsWhitelist,
+      final Set<String> fieldsBlacklist,
       final Schema keySchema,
       final Schema valueSchema,
       final Map<String, UdfField> udfFields
@@ -135,6 +138,9 @@ public class FieldsMetadata {
           continue;
         }
         if (!fieldsWhitelist.isEmpty() && !fieldsWhitelist.contains(field.name())) {
+          continue;
+        }
+        if (!fieldsBlacklist.isEmpty() && fieldsBlacklist.contains(field.name())) {
           continue;
         }
 

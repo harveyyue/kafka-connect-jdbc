@@ -27,6 +27,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import io.confluent.connect.jdbc.dialect.DatabaseDialect;
+import io.confluent.connect.jdbc.sink.doris.DorisBufferedRecords;
+import io.confluent.connect.jdbc.sink.doris.DorisRestService;
 import io.confluent.connect.jdbc.util.CachedConnectionProvider;
 import io.confluent.connect.jdbc.util.TableId;
 import io.confluent.connect.jdbc.util.TableShardDefinition;
@@ -42,6 +44,7 @@ public class JdbcDbWriter {
   final CachedConnectionProvider cachedConnectionProvider;
   final Map<TableId, TableId> tableIdMapping = new HashMap<>();
   final Map<String, TableId> topicToTableIdCache = new HashMap<>();
+  private DorisRestService dorisRestService;
 
   JdbcDbWriter(final JdbcSinkConfig config, DatabaseDialect dbDialect, DbStructure dbStructure) {
     this.config = config;
@@ -53,8 +56,8 @@ public class JdbcDbWriter {
         config.connectionBackoffMs
     );
     config.rawTableIdMapping.forEach((k, v) ->
-            tableIdMapping.put(
-                    dbDialect.parseTableIdentifier(k), dbDialect.parseTableIdentifier(v)));
+        tableIdMapping.put(
+            dbDialect.parseTableIdentifier(k), dbDialect.parseTableIdentifier(v)));
   }
 
   protected CachedConnectionProvider connectionProvider(int maxConnAttempts, long retryBackoff) {
@@ -75,7 +78,7 @@ public class JdbcDbWriter {
       for (SinkRecord record : records) {
         TableId tableId;
         TableShardDefinition tableShardDefinition =
-                config.tableShardDefinitions.get(record.topic());
+            config.tableShardDefinitions.get(record.topic());
         if (tableShardDefinition != null) {
           Object rawValue = ((Struct) record.value()).get(tableShardDefinition.getShardColumn());
           if (rawValue == null) {
@@ -97,11 +100,16 @@ public class JdbcDbWriter {
             return currentTableId;
           });
         }
-        BufferedRecords buffer = bufferByTable.get(tableId);
-        if (buffer == null) {
-          buffer = new BufferedRecords(config, tableId, dbDialect, dbStructure, connection);
-          bufferByTable.put(tableId, buffer);
-        }
+        BufferedRecords buffer = bufferByTable.computeIfAbsent(tableId, key -> {
+          if (dbDialect.name().equalsIgnoreCase("doris")) {
+            if (dorisRestService == null) {
+              dorisRestService = new DorisRestService(config);
+            }
+            return new DorisBufferedRecords(
+                config, tableId, dbDialect, dbStructure, connection, dorisRestService);
+          }
+          return new JdbcBufferedRecords(config, tableId, dbDialect, dbStructure, connection);
+        });
         buffer.add(record);
       }
       for (Map.Entry<TableId, BufferedRecords> entry : bufferByTable.entrySet()) {

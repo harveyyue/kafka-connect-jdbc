@@ -240,6 +240,7 @@ public class ExpressionBuilder {
   private final IdentifierRules rules;
   private final StringBuilder sb = new StringBuilder();
   private QuoteMethod quoteSqlIdentifiers = DEFAULT_QUOTE_METHOD;
+  public String dialect;
 
   /**
    * Create a new expression builder with the default {@link IdentifierRules}.
@@ -281,6 +282,14 @@ public class ExpressionBuilder {
       return this;
     }
     return new ExpressionBuilder(this.rules.escapeQuotesWith(prefix));
+  }
+
+  /**
+   * Indentify the database dialect for expression builder
+   */
+  public ExpressionBuilder setDialect(String dialect) {
+    this.dialect = dialect;
+    return this;
   }
 
   /**
