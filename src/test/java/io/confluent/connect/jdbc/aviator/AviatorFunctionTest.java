@@ -19,6 +19,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 
 public class AviatorFunctionTest {
@@ -49,5 +50,16 @@ public class AviatorFunctionTest {
     AviatorDateUtils.removeCurrentDateTime();
     date = (String) AviatorHelper.execute("date()");
     assertNotNull(date);
+  }
+
+  @Test
+  public void testCurrentTimestampFunction() {
+    long timestamp = (long) AviatorHelper.execute("current_timestamp()");
+    assertEquals(1679875200000L, timestamp);
+
+    AviatorDateUtils.removeCurrentDateTime();
+    long currentTimestamp = (long) AviatorHelper.execute("current_timestamp()");
+    assertEquals(13, String.valueOf(timestamp).length());
+    assertNotEquals(currentTimestamp, timestamp);
   }
 }

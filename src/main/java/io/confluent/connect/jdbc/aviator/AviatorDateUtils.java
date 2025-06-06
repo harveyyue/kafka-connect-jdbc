@@ -52,4 +52,11 @@ public class AviatorDateUtils {
   public static String addDate(int number, String pattern) {
     return getZonedDateTime().plusDays(number).format(DateTimeFormatter.ofPattern(pattern));
   }
+
+  public static long currentTimeMillis() {
+    if (CURRENT_DATE_TIME.get() != null) {
+      return CURRENT_DATE_TIME.get().toInstant().toEpochMilli();
+    }
+    return System.currentTimeMillis();
+  }
 }

@@ -17,6 +17,7 @@ package io.confluent.connect.jdbc.aviator;
 
 import com.googlecode.aviator.AviatorEvaluator;
 
+import io.confluent.connect.jdbc.aviator.function.CurrentTimestampFunction;
 import io.confluent.connect.jdbc.aviator.function.DateFunction;
 
 public class AviatorHelper {
@@ -24,6 +25,7 @@ public class AviatorHelper {
   static {
     // register aviator functions
     AviatorEvaluator.addFunction(new DateFunction());
+    AviatorEvaluator.addFunction(new CurrentTimestampFunction());
   }
 
   /**
