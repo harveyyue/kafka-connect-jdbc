@@ -89,8 +89,9 @@ public class JdbcSinkTask extends SinkTask {
     if (records.isEmpty()) {
       return;
     }
-    final long start = records.stream().findFirst().get().timestamp();
+
     final SinkRecord first = records.iterator().next();
+    final long start = first.timestamp();
     final int recordsCount = records.size();
     log.debug(
         "Received {} records. First record kafka coordinates:({}-{}-{}). Writing them to the "

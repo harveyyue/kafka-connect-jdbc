@@ -51,11 +51,11 @@ public class BufferedRecords {
   private final DatabaseDialect dbDialect;
   private final DbStructure dbStructure;
   private final Connection connection;
+  private final RecordValidator recordValidator;
 
   private List<SinkRecord> records = new ArrayList<>();
   private Schema keySchema;
   private Schema valueSchema;
-  private RecordValidator recordValidator;
   private FieldsMetadata fieldsMetadata;
   private PreparedStatement updatePreparedStatement;
   private PreparedStatement deletePreparedStatement;
@@ -97,6 +97,9 @@ public class BufferedRecords {
     } else if (Objects.equals(valueSchema, record.valueSchema())) {
       if (config.deleteEnabled && deletesInBatch) {
         // flush so an insert after a delete of same record isn't lost
+        // we must warn of a large number of deleted records here
+        log.warn("Flush the deleted statement immediately, "
+            + "maybe reduce the sink performance when have a large number of records");
         flushed.addAll(flush());
       }
     } else {
@@ -117,9 +120,6 @@ public class BufferedRecords {
       List<UdfField> tableUdfFields = config.udfColumnList.stream()
           .filter(udfField -> udfField.table().equalsIgnoreCase(tableId.tableName()))
           .collect(Collectors.toList());
-      if (!tableUdfFields.isEmpty()) {
-        log.info("Table {} udf columns: {}", tableId.tableName(), tableUdfFields);
-      }
       fieldsMetadata = FieldsMetadata.extract(
           tableId.tableName(),
           config.pkMode,
