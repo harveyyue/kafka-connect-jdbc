@@ -37,7 +37,7 @@ public class FieldsMetadata {
   public final Set<String> keyFieldNames;
   public final Set<String> nonKeyFieldNames;
   public final Map<String, SinkRecordField> allFields;
-  public final List<UdfField> udfFields;
+  public final Map<String, UdfField> udfFields;
 
   // visible for testing
   public FieldsMetadata(
@@ -45,17 +45,17 @@ public class FieldsMetadata {
       Set<String> nonKeyFieldNames,
       Map<String, SinkRecordField> allFields
   ) {
-    this(keyFieldNames, nonKeyFieldNames, allFields, Collections.emptyList());
+    this(keyFieldNames, nonKeyFieldNames, allFields, Collections.emptyMap());
   }
 
   public FieldsMetadata(
       Set<String> keyFieldNames,
       Set<String> nonKeyFieldNames,
       Map<String, SinkRecordField> allFields,
-      List<UdfField> udfFields
+      Map<String, UdfField> udfFields
   ) {
     boolean fieldCountsMatch = (keyFieldNames.size() + nonKeyFieldNames.size() == allFields.size());
-    Set<String> udfFieldNames = udfFields.stream()
+    Set<String> udfFieldNames = udfFields.values().stream()
         .map(UdfField::column)
         .collect(Collectors.toSet());
     boolean allFieldsContained = (allFields.keySet().containsAll(keyFieldNames)
@@ -79,7 +79,7 @@ public class FieldsMetadata {
       final List<String> configuredPkFields,
       final Set<String> fieldsWhitelist,
       final SchemaPair schemaPair,
-      final List<UdfField> udfFields
+      final Map<String, UdfField> udfFields
   ) {
     return extract(
         tableName,
@@ -99,7 +99,7 @@ public class FieldsMetadata {
       final Set<String> fieldsWhitelist,
       final Schema keySchema,
       final Schema valueSchema,
-      final List<UdfField> udfFields
+      final Map<String, UdfField> udfFields
   ) {
     if (valueSchema != null && valueSchema.type() != Schema.Type.STRUCT) {
       throw new ConnectException("Value schema must be of type Struct");
@@ -145,7 +145,7 @@ public class FieldsMetadata {
       }
     }
 
-    for (UdfField udfField : udfFields) {
+    for (UdfField udfField : udfFields.values()) {
       if (nonKeyFieldNames.contains(udfField.column())) {
         continue;
       }

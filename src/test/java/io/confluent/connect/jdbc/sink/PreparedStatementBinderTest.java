@@ -118,9 +118,9 @@ public class PreparedStatementBinderTest {
 
     List<String> pkFields = Collections.singletonList("long");
 
-    List<UdfField> udfFields = new ArrayList<>();
-    udfFields.add(new UdfField("people", "datetime", "date(0,'yyyy-MM-dd HH:mm:ss')", "string"));
-    udfFields.add(new UdfField("people","dt", "date()", "string"));
+    Map<String, UdfField> udfFields = new HashMap<>();
+    udfFields.put("datetime", new UdfField("people", "datetime", "date(0,'yyyy-MM-dd HH:mm:ss')", "string"));
+    udfFields.put("dt", new UdfField("people","dt", "date()", "string"));
     FieldsMetadata fieldsMetadata = FieldsMetadata.extract("people", pkMode, pkFields, Collections.emptySet(), schemaPair, udfFields);
 
     PreparedStatement statement = mock(PreparedStatement.class);
@@ -235,7 +235,7 @@ public class PreparedStatementBinderTest {
 
       List<String> pkFields = Collections.singletonList("long");
 
-      FieldsMetadata fieldsMetadata = FieldsMetadata.extract("people", pkMode, pkFields, Collections.<String>emptySet(), schemaPair, Collections.emptyList());
+      FieldsMetadata fieldsMetadata = FieldsMetadata.extract("people", pkMode, pkFields, Collections.<String>emptySet(), schemaPair, Collections.emptyMap());
 
       PreparedStatement statement = mock(PreparedStatement.class);
       TableId tabId = new TableId("ORCL", "ADMIN", "people");
@@ -286,7 +286,7 @@ public class PreparedStatementBinderTest {
       List<String> pkFields = Collections.singletonList("long");
 
       FieldsMetadata fieldsMetadata = FieldsMetadata.extract("people", pkMode, pkFields,
-              Collections.<String>emptySet(), schemaPair, Collections.emptyList());
+              Collections.<String>emptySet(), schemaPair, Collections.emptyMap());
 
       PreparedStatement statement = mock(PreparedStatement.class);
       TableId tabId = new TableId("ORCL", "ADMIN", "people");

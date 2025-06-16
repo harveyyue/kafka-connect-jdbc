@@ -29,6 +29,7 @@ import java.sql.BatchUpdateException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -117,9 +118,9 @@ public class BufferedRecords {
           record.valueSchema()
       );
       // Add current table's udf columns if needed
-      List<UdfField> tableUdfFields = config.udfColumnList.stream()
+      Map<String, UdfField> tableUdfFields = config.udfColumnList.stream()
           .filter(udfField -> udfField.table().equalsIgnoreCase(tableId.tableName()))
-          .collect(Collectors.toList());
+          .collect(Collectors.toMap(UdfField::column, udfField -> udfField));
       fieldsMetadata = FieldsMetadata.extract(
           tableId.tableName(),
           config.pkMode,

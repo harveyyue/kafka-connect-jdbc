@@ -25,7 +25,6 @@ import org.apache.kafka.connect.sink.SinkRecord;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.Optional;
 
 import io.confluent.connect.jdbc.dialect.DatabaseDialect;
 import io.confluent.connect.jdbc.dialect.DatabaseDialect.StatementBinder;
@@ -177,11 +176,8 @@ public class PreparedStatementBinder implements StatementBinder {
       int index
   ) throws SQLException {
     for (final String fieldName : fieldsMetadata.nonKeyFieldNames) {
-      Optional<UdfField> udfFieldOpt = fieldsMetadata.udfFields.stream()
-          .filter(udfField -> udfField.column().equals(fieldName))
-          .findFirst();
-      if (udfFieldOpt.isPresent()) {
-        UdfField udfField = udfFieldOpt.get();
+      UdfField udfField = fieldsMetadata.udfFields.get(fieldName);
+      if (udfField != null) {
         bindField(index++, udfField.schema(), udfField.execute(), udfField.column());
       } else {
         final Field field = record.valueSchema().field(fieldName);
