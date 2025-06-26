@@ -15,21 +15,32 @@
 
 package io.confluent.connect.jdbc.dialect;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.confluent.connect.jdbc.sink.doris.DorisJsonConverter;
-import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
+import io.confluent.connect.jdbc.util.AlterType;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
+import org.junit.Before;
 import org.junit.Test;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import static io.confluent.connect.jdbc.sink.doris.DorisJsonConverter.DEBEZIUM_DELETED_FIELD;
+import static io.confluent.connect.jdbc.sink.doris.DorisJsonConverter.DORIS_DELETE_SIGN;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 public class DorisDatabaseDialectTest extends BaseDialectTest<DorisDatabaseDialect> {
+
+  private DorisJsonConverter converter;
+
+  @Before
+  public void setup() throws Exception {
+    super.setup();
+    converter = DorisJsonConverter.getInstance();
+  }
 
   @Override
   protected DorisDatabaseDialect createDialect() {
@@ -57,15 +68,20 @@ public class DorisDatabaseDialectTest extends BaseDialectTest<DorisDatabaseDiale
 
   @Test
   public void shouldBuildMultipleAlterStatement() {
-    List<SinkRecordField> alterFields = new ArrayList<>();
-    alterFields.add(new SinkRecordField(
-        SchemaBuilder.int32().defaultValue(42).build(), "foo", false));
-    alterFields.add(new SinkRecordField(
-        SchemaBuilder.string().defaultValue("I'm bar").build(), "bar", false));
-    List<String> alteredStatements = dialect.buildAlterTable(tableId, alterFields);
+    List<String> alteredStatements = dialect.buildAlterTable(tableId, alterFields());
     List<String> expectedStatements = Arrays.asList(
         "ALTER TABLE `myTable` ADD COLUMN `foo` INT DEFAULT '42'",
         "ALTER TABLE `myTable` ADD COLUMN `bar` STRING DEFAULT 'I'm bar'");
+    assertEquals(2, alteredStatements.size());
+    assertEquals(alteredStatements, expectedStatements);
+  }
+
+  @Test
+  public void shouldBuildMultipleAlterModifyStatement() {
+    List<String> alteredStatements = dialect.buildAlterTable(tableId, alterFields(), dialect.expressionBuilder().setAlterType(AlterType.MODIFY));
+    List<String> expectedStatements = Arrays.asList(
+        "ALTER TABLE `myTable` MODIFY COLUMN `foo` INT DEFAULT '42'",
+        "ALTER TABLE `myTable` MODIFY COLUMN `bar` STRING DEFAULT 'I'm bar'");
     assertEquals(2, alteredStatements.size());
     assertEquals(alteredStatements, expectedStatements);
   }
@@ -80,7 +96,9 @@ public class DorisDatabaseDialectTest extends BaseDialectTest<DorisDatabaseDiale
         .put("name", "cuba")
         .put(DEBEZIUM_DELETED_FIELD, false);
 
-    DorisJsonConverter converter = new DorisJsonConverter();
+    JsonNode jsonNode = converter.convertToJson(schemaA, valueA);
+    assertNull(jsonNode.get(DEBEZIUM_DELETED_FIELD));
+    assertEquals("0",  jsonNode.get(DORIS_DELETE_SIGN).asText());
     byte[] bytes = converter.serialize(null, schemaA, valueA);
     assertEquals(43, bytes.length);
   }

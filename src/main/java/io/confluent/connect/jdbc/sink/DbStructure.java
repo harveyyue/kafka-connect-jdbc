@@ -15,28 +15,33 @@
 
 package io.confluent.connect.jdbc.sink;
 
+import io.confluent.connect.jdbc.dialect.DatabaseDialect;
+import io.confluent.connect.jdbc.sink.metadata.FieldsMetadata;
+import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
+import io.confluent.connect.jdbc.util.AlterType;
+import io.confluent.connect.jdbc.util.ColumnDefinition;
+import io.confluent.connect.jdbc.util.TableDefinition;
+import io.confluent.connect.jdbc.util.TableDefinitions;
+import io.confluent.connect.jdbc.util.TableId;
+import io.confluent.connect.jdbc.util.TableType;
+import org.apache.kafka.connect.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import io.confluent.connect.jdbc.dialect.DatabaseDialect;
-import io.confluent.connect.jdbc.sink.metadata.FieldsMetadata;
-import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
-import io.confluent.connect.jdbc.util.TableDefinition;
-import io.confluent.connect.jdbc.util.TableDefinitions;
-import io.confluent.connect.jdbc.util.TableId;
-import io.confluent.connect.jdbc.util.TableType;
+import java.util.stream.Collectors;
 
 public class DbStructure {
   private static final Logger log = LoggerFactory.getLogger(DbStructure.class);
 
+  private static final List<String> MODIFY_TYPE = Arrays.asList("CHAR", "VARCHAR");
   private final DatabaseDialect dbDialect;
   private final TableDefinitions tableDefns;
 
@@ -48,9 +53,9 @@ public class DbStructure {
   /**
    * Create or amend table.
    *
-   * @param config the connector configuration
-   * @param connection the database connection handle
-   * @param tableId the table ID
+   * @param config         the connector configuration
+   * @param connection     the database connection handle
+   * @param tableId        the table ID
    * @param fieldsMetadata the fields metadata
    * @return whether a DDL operation was performed
    * @throws SQLException if a DDL operation was deemed necessary but failed
@@ -154,7 +159,12 @@ public class DbStructure {
         tableDefn.columnNames()
     );
 
-    if (missingFields.isEmpty()) {
+    final Set<SinkRecordField> modifyingFields = modifyingFields(
+        fieldsMetadata.allFields.values(),
+        tableDefn
+    );
+
+    if (missingFields.isEmpty() && modifyingFields.isEmpty()) {
       return false;
     }
 
@@ -177,19 +187,6 @@ public class DbStructure {
         );
     }
 
-    for (SinkRecordField missingField: missingFields) {
-      if (!missingField.isOptional() && missingField.defaultValue() == null) {
-        // Adjust TableAlterOrCreateException exception to warn log
-        log.warn(String.format(
-            "Cannot ALTER %s %s to add missing field %s, as the field is not optional and does "
-            + "not have a default value",
-            type.jdbcName(),
-            tableId,
-            missingField
-        ));
-      }
-    }
-
     if (!config.autoEvolve) {
       throw new TableAlterOrCreateException(String.format(
           "%s %s is missing fields (%s) and auto-evolution is disabled",
@@ -199,42 +196,98 @@ public class DbStructure {
       ));
     }
 
-    final List<String> amendTableQueries = dbDialect.buildAlterTable(tableId, missingFields);
-    log.info(
-        "Amending {} to add missing fields:{} maxRetries:{} with SQL: {}",
-        type,
-        missingFields,
-        maxRetries,
-        amendTableQueries
-    );
-    try {
-      dbDialect.applyDdlStatements(connection, amendTableQueries);
-    } catch (SQLException sqle) {
-      if (maxRetries <= 0) {
-        throw new TableAlterOrCreateException(
-            String.format(
-                "Failed to amend %s '%s' to add missing fields: %s",
-                type,
-                tableId,
-                missingFields
-            ),
-            sqle
+    if (!missingFields.isEmpty()) {
+      verifyAlterFields(missingFields, tableId, type, "missing");
+      final List<String> amendTableQueries = dbDialect.buildAlterTable(tableId, missingFields);
+      log.info(
+          "Amending {} to add missing fields:{} maxRetries:{} with SQL: {}",
+          type,
+          missingFields,
+          maxRetries,
+          amendTableQueries
+      );
+      try {
+        dbDialect.applyDdlStatements(connection, amendTableQueries);
+      } catch (SQLException sqle) {
+        if (maxRetries <= 0) {
+          throw new TableAlterOrCreateException(
+              String.format(
+                  "Failed to amend %s '%s' to add missing fields: %s",
+                  type,
+                  tableId,
+                  missingFields
+              ),
+              sqle
+          );
+        }
+        log.warn("Amend failed, re-attempting", sqle);
+        tableDefns.refresh(connection, tableId);
+        // Perhaps there was a race with other tasks to add the columns
+        return amendIfNecessary(
+            config,
+            connection,
+            tableId,
+            fieldsMetadata,
+            maxRetries - 1
         );
       }
-      log.warn("Amend failed, re-attempting", sqle);
-      tableDefns.refresh(connection, tableId);
-      // Perhaps there was a race with other tasks to add the columns
-      return amendIfNecessary(
-          config,
-          connection,
-          tableId,
-          fieldsMetadata,
-          maxRetries - 1
+    }
+
+    if (!modifyingFields.isEmpty()) {
+      verifyAlterFields(modifyingFields, tableId, type, "modifying");
+      final List<String> modifiedTableColumnStatements = dbDialect.buildAlterTable(
+          tableId, modifyingFields, dbDialect.expressionBuilder().setAlterType(AlterType.MODIFY));
+      log.info(
+          "Amending {} to add modifying fields:{} maxRetries:{} with SQL: {}",
+          type,
+          modifyingFields,
+          maxRetries,
+          modifiedTableColumnStatements
       );
+      try {
+        dbDialect.applyDdlStatements(connection, modifiedTableColumnStatements);
+      } catch (SQLException sqle) {
+        if (maxRetries <= 0) {
+          throw new TableAlterOrCreateException(
+              String.format(
+                  "Failed to amend %s '%s' to add modifying fields: %s",
+                  type,
+                  tableId,
+                  modifyingFields
+              ),
+              sqle
+          );
+        }
+        log.warn("Amend failed, re-attempting", sqle);
+        tableDefns.refresh(connection, tableId);
+        // Perhaps there was a race with other tasks to add the columns
+        return amendIfNecessary(
+            config,
+            connection,
+            tableId,
+            fieldsMetadata,
+            maxRetries - 1
+        );
+      }
     }
 
     tableDefns.refresh(connection, tableId);
     return true;
+  }
+
+  private void verifyAlterFields(
+      Set<SinkRecordField> alterFields,
+      TableId tableId,
+      TableType type,
+      String label
+  ) {
+    for (SinkRecordField missingField : alterFields) {
+      if (!missingField.isOptional() && missingField.defaultValue() == null) {
+        // Adjust TableAlterOrCreateException exception to warn log
+        log.warn("Cannot ALTER {} {} to add {} field {}, as the field is not optional and does "
+            + "not have a default value", type.jdbcName(), tableId, label, missingField);
+      }
+    }
   }
 
   Set<SinkRecordField> missingFields(
@@ -255,7 +308,7 @@ public class DbStructure {
 
     // check if the missing fields can be located by ignoring case
     Set<String> columnNamesLowerCase = new HashSet<>();
-    for (String columnName: dbColumnNames) {
+    for (String columnName : dbColumnNames) {
       columnNamesLowerCase.add(columnName.toLowerCase());
     }
 
@@ -267,13 +320,13 @@ public class DbStructure {
     }
 
     final Set<SinkRecordField> missingFieldsIgnoreCase = new HashSet<>();
-    for (SinkRecordField missing: missingFields) {
+    for (SinkRecordField missing : missingFields) {
       if (!columnNamesLowerCase.contains(missing.name().toLowerCase())) {
         missingFieldsIgnoreCase.add(missing);
       }
     }
 
-    if (missingFieldsIgnoreCase.size() > 0) {
+    if (!missingFieldsIgnoreCase.isEmpty()) {
       log.info(
           "Unable to find fields {} among column names {}",
           missingFieldsIgnoreCase,
@@ -282,5 +335,36 @@ public class DbStructure {
     }
 
     return missingFieldsIgnoreCase;
+  }
+
+  Set<SinkRecordField> modifyingFields(
+      Collection<SinkRecordField> fields,
+      TableDefinition tableDefn
+  ) {
+    final Set<SinkRecordField> modifyingFields = new HashSet<>();
+    if (fields.size() != tableDefn.columnCount()) {
+      log.warn(
+          "Table {} has column names that differ only by source, "
+              + "target table has {} columns, source has {} columns.",
+          tableDefn.id(),
+          tableDefn.columnCount(),
+          fields.size());
+    }
+    fields =
+        fields.stream()
+            .filter(field -> field.schemaType().equals(Schema.Type.STRING)
+                && field.getSourceColumnType().isPresent()
+                && field.getSourceColumnSize().isPresent()
+                && MODIFY_TYPE.contains(field.getSourceColumnType().get().toUpperCase()))
+            .collect(Collectors.toSet());
+    for (SinkRecordField field : fields) {
+      ColumnDefinition columnDefinition = tableDefn.definitionForColumn(field.name());
+      if (columnDefinition != null
+          && columnDefinition.typeName().equalsIgnoreCase(field.getSourceColumnType().get())
+          && columnDefinition.precision() != field.getSourceColumnSize().get()) {
+        modifyingFields.add(field);
+      }
+    }
+    return modifyingFields;
   }
 }

@@ -64,7 +64,7 @@ public class DorisDatabaseDialect extends MySqlDatabaseDialect {
       TableId table,
       Collection<SinkRecordField> fields
   ) {
-    ExpressionBuilder builder = expressionBuilder().setDialect(name());
+    ExpressionBuilder builder = expressionBuilder();
 
     final List<String> pkFieldNames = extractPrimaryKeyFieldNames(fields);
     builder.append("CREATE TABLE ");
@@ -112,22 +112,22 @@ public class DorisDatabaseDialect extends MySqlDatabaseDialect {
       Collection<SinkRecordField> fields
   ) {
     final List<String> queries = new ArrayList<>(fields.size());
-
-    final ExpressionBuilder.Transform<SinkRecordField> transform = (builder, field) -> {
-      builder.append("ADD COLUMN ");
-      writeColumnSpec(builder, field);
-    };
-
     for (SinkRecordField field : fields) {
-      ExpressionBuilder builder = expressionBuilder().setDialect(name());
-      builder.append("ALTER TABLE ");
-      builder.append(table);
-      builder.append(" ");
-      builder.appendList()
-          .delimitedBy(",")
-          .transformedBy(transform)
-          .of(Collections.singletonList(field));
-      queries.add(builder.toString());
+      queries.addAll(super.buildAlterTable(table, Collections.singleton(field)));
+    }
+    return queries;
+  }
+
+  @Override
+  public List<String> buildAlterTable(
+      TableId table,
+      Collection<SinkRecordField> fields,
+      ExpressionBuilder builder
+  ) {
+    final List<String> queries = new ArrayList<>(fields.size());
+    for (SinkRecordField field : fields) {
+      queries.addAll(
+          super.buildAlterTable(table, Collections.singleton(field), builder.renew(builder)));
     }
     return queries;
   }

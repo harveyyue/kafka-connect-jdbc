@@ -1,10 +1,7 @@
 package io.confluent.connect.jdbc.dialect;
 
-import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
-import org.apache.kafka.connect.data.SchemaBuilder;
 import org.junit.Test;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -33,12 +30,7 @@ public class TidbDatabaseDialectTest extends BaseDialectTest<MySqlDatabaseDialec
 
   @Test
   public void shouldBuildMultipleAlterStatement() {
-    List<SinkRecordField> alterFields = new ArrayList<>();
-    alterFields.add(new SinkRecordField(
-        SchemaBuilder.int32().defaultValue(42).build(), "foo", false));
-    alterFields.add(new SinkRecordField(
-        SchemaBuilder.string().defaultValue("I'm bar").build(), "bar", false));
-    List<String> alteredStatements = dialect.buildAlterTable(tableId, alterFields);
+    List<String> alteredStatements = dialect.buildAlterTable(tableId, alterFields());
     List<String> expectedStatements = Arrays.asList("ALTER TABLE `myTable` ADD `foo` INT DEFAULT 42",
         "ALTER TABLE `myTable` ADD `bar` TEXT NOT NULL");
     assertEquals(2, alteredStatements.size());

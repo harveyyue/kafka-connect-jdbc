@@ -563,6 +563,20 @@ public interface DatabaseDialect extends ConnectionProvider {
   List<String> buildAlterTable(TableId table, Collection<SinkRecordField> fields);
 
   /**
+   * Build the ALTER TABLE statement expression for the given table and its columns.
+   *
+   * @param table   the identifier of the table; may not be null
+   * @param fields  the information about the fields in the sink records; may not be null
+   * @param builder the expression builder
+   * @return the ALTER TABLE statement; may not be null
+   */
+  List<String> buildAlterTable(
+      TableId table,
+      Collection<SinkRecordField> fields,
+      ExpressionBuilder builder
+  );
+
+  /**
    * Create a component that can bind record values into the supplied prepared statement.
    * @param statement      the prepared statement
    * @param pkMode         the primary key mode; may not be null

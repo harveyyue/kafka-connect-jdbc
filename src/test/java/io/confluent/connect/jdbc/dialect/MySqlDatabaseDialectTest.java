@@ -16,23 +16,17 @@
 package io.confluent.connect.jdbc.dialect;
 
 import io.confluent.connect.jdbc.sink.JdbcSinkConfig;
-import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
+import io.confluent.connect.jdbc.util.QuoteMethod;
+import io.confluent.connect.jdbc.util.TableId;
 import org.apache.kafka.connect.data.Date;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Schema.Type;
-import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Time;
 import org.apache.kafka.connect.data.Timestamp;
 import org.junit.Test;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-
-import io.confluent.connect.jdbc.util.QuoteMethod;
-import io.confluent.connect.jdbc.util.TableId;
 
 import static org.junit.Assert.assertEquals;
 
@@ -58,10 +52,10 @@ public class MySqlDatabaseDialectTest extends BaseDialectTest<MySqlDatabaseDiale
 
   @Test
   public void shouldMapDecimalSchemaTypeToDecimalSqlType() {
-    assertDecimalMapping(0, "DECIMAL(65,0)");
-    assertDecimalMapping(3, "DECIMAL(65,3)");
-    assertDecimalMapping(4, "DECIMAL(65,4)");
-    assertDecimalMapping(5, "DECIMAL(65,5)");
+    assertDecimalMapping(0, "DECIMAL(65, 0)");
+    assertDecimalMapping(3, "DECIMAL(65, 3)");
+    assertDecimalMapping(4, "DECIMAL(65, 4)");
+    assertDecimalMapping(5, "DECIMAL(65, 5)");
   }
 
   @Test
@@ -75,8 +69,8 @@ public class MySqlDatabaseDialectTest extends BaseDialectTest<MySqlDatabaseDiale
     verifyDataTypeMapping("TINYINT", Schema.BOOLEAN_SCHEMA);
     verifyDataTypeMapping("TEXT", Schema.STRING_SCHEMA);
     verifyDataTypeMapping("VARBINARY(1024)", Schema.BYTES_SCHEMA);
-    verifyDataTypeMapping("DECIMAL(65,0)", Decimal.schema(0));
-    verifyDataTypeMapping("DECIMAL(65,2)", Decimal.schema(2));
+    verifyDataTypeMapping("DECIMAL(65, 0)", Decimal.schema(0));
+    verifyDataTypeMapping("DECIMAL(65, 2)", Decimal.schema(2));
     verifyDataTypeMapping("DATE", Date.SCHEMA);
     verifyDataTypeMapping("TIME(3)", Time.SCHEMA);
     verifyDataTypeMapping("DATETIME(3)", Timestamp.SCHEMA);
@@ -112,7 +106,7 @@ public class MySqlDatabaseDialectTest extends BaseDialectTest<MySqlDatabaseDiale
         "CREATE TABLE `myTable` (\n" + "`c1` INT NOT NULL,\n" + "`c2` BIGINT NOT NULL,\n" +
         "`c3` VARCHAR(100) NOT NULL,\n" + "`c4` TEXT NULL,\n" +
         "`c5` DATE DEFAULT '2001-03-15',\n" + "`c6` TIME(3) DEFAULT '00:00:00.000',\n" +
-        "`c7` DATETIME(3) DEFAULT '2001-03-15 00:00:00.000',\n" + "`c8` DECIMAL(65,4) NULL,\n" +
+        "`c7` DATETIME(3) DEFAULT '2001-03-15 00:00:00.000',\n" + "`c8` DECIMAL(65, 4) NULL,\n" +
         "`c9` TINYINT DEFAULT 1,\n" +
         "PRIMARY KEY(`c1`))";
     String sql = dialect.buildCreateTableStatement(tableId, buildSinkRecordFieldsIncludingSchemaParameters());
@@ -127,7 +121,7 @@ public class MySqlDatabaseDialectTest extends BaseDialectTest<MySqlDatabaseDiale
         "ADD `c3` TEXT NOT NULL,\n" + "ADD `c4` TEXT NULL,\n" +
         "ADD `c5` DATE DEFAULT '2001-03-15',\n" + "ADD `c6` TIME(3) DEFAULT '00:00:00.000',\n" +
         "ADD `c7` DATETIME(3) DEFAULT '2001-03-15 00:00:00.000',\n" +
-        "ADD `c8` DECIMAL(65,4) NULL,\n" +
+        "ADD `c8` DECIMAL(65, 4) NULL,\n" +
         "ADD `c9` TINYINT DEFAULT 1"};
     assertStatements(sql, statements);
   }

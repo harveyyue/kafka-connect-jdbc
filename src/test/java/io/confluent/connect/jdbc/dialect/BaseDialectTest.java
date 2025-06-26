@@ -603,4 +603,13 @@ public abstract class BaseDialectTest<T extends GenericDatabaseDialect> {
     });
     return sinkRecordFieldsIncludingSchemaParameters;
   }
+
+  protected List<SinkRecordField> alterFields() {
+    List<SinkRecordField> alterFields = new ArrayList<>();
+    alterFields.add(new SinkRecordField(
+        SchemaBuilder.int32().defaultValue(42).build(), "foo", false));
+    alterFields.add(new SinkRecordField(
+        SchemaBuilder.string().defaultValue("I'm bar").build(), "bar", false));
+    return alterFields;
+  }
 }

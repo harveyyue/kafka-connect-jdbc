@@ -18,6 +18,7 @@ package io.confluent.connect.jdbc.dialect;
 import java.time.ZoneOffset;
 import java.util.TimeZone;
 
+import io.confluent.connect.jdbc.util.AlterType;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.config.types.Password;
@@ -545,7 +546,8 @@ public class GenericDatabaseDialect implements DatabaseDialect {
   @Override
   public ExpressionBuilder expressionBuilder() {
     return identifierRules().expressionBuilder()
-                            .setQuoteIdentifiers(quoteSqlIdentifiers);
+                            .setQuoteIdentifiers(quoteSqlIdentifiers)
+                            .setDialect(name());
   }
 
   /**
@@ -1838,24 +1840,36 @@ public class GenericDatabaseDialect implements DatabaseDialect {
       TableId table,
       Collection<SinkRecordField> fields
   ) {
+    return buildAlterTable(table, fields, expressionBuilder());
+  }
+
+  @Override
+  public List<String> buildAlterTable(
+      TableId table,
+      Collection<SinkRecordField> fields,
+      ExpressionBuilder builder
+  ) {
     final boolean newlines = fields.size() > 1;
 
-    final Transform<SinkRecordField> transform = (builder, field) -> {
+    final Transform<SinkRecordField> transform = (expressionBuilder, field) -> {
       if (newlines) {
-        builder.appendNewLine();
+        expressionBuilder.appendNewLine();
       }
-      builder.append("ADD ");
-      writeColumnSpec(builder, field);
+      String alterType = expressionBuilder.alterType.equals(AlterType.ADD) ? "ADD " : "MODIFY ";
+      expressionBuilder.append(alterType);
+      if (builder.dialect.equals("Doris")) {
+        builder.append("COLUMN ");
+      }
+      writeColumnSpec(expressionBuilder, field);
     };
 
-    ExpressionBuilder builder = expressionBuilder();
     builder.append("ALTER TABLE ");
     builder.append(table);
     builder.append(" ");
     builder.appendList()
-           .delimitedBy(",")
-           .transformedBy(transform)
-           .of(fields);
+        .delimitedBy(",")
+        .transformedBy(transform)
+        .of(fields);
     return Collections.singletonList(builder.toString());
   }
 
