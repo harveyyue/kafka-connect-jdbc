@@ -22,10 +22,12 @@ import io.confluent.connect.jdbc.sink.metadata.UdfField;
 import io.confluent.connect.jdbc.util.ColumnId;
 import io.confluent.connect.jdbc.util.TableId;
 import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
 
 import java.sql.Connection;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -76,9 +78,23 @@ public abstract class AbstractBufferedRecords implements BufferedRecords {
   protected FieldsMetadata extractFieldsMetadata(SinkRecord record) {
     SchemaPair schemaPair = getSchemaPair(record);
     // Add current table's udf columns if needed
-    Map<String, UdfField> tableUdfFields = config.udfColumnList.stream()
+    Map<String, UdfField> tableUdfFields =
+        config.udfColumnList.stream()
             .filter(udfField -> udfField.table().equalsIgnoreCase(tableId.tableName()))
             .collect(Collectors.toMap(UdfField::column, udfField -> udfField));
+    List<UdfField> invalidatedUdfFields =
+        tableUdfFields.values().stream()
+            .filter(udfField ->
+                udfField.inputColumnsExist()
+                    && !udfField.inputColumnsValidate(schemaPair.valueSchema))
+            .collect(Collectors.toList());
+    if (!invalidatedUdfFields.isEmpty()) {
+      throw new ConnectException(
+          String.format(
+              "Udf fields does not exist in table %s, udf definition: %s",
+              tableId,
+              invalidatedUdfFields));
+    }
     return FieldsMetadata.extract(
         tableId.tableName(),
         config.pkMode,

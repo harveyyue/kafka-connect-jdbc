@@ -16,9 +16,16 @@
 package io.confluent.connect.jdbc.sink.doris;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.BooleanNode;
+import com.fasterxml.jackson.databind.node.DoubleNode;
+import com.fasterxml.jackson.databind.node.FloatNode;
+import com.fasterxml.jackson.databind.node.IntNode;
+import com.fasterxml.jackson.databind.node.LongNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
+import io.confluent.connect.jdbc.sink.metadata.UdfField;
 import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.json.JsonConverterConfig;
 import org.apache.kafka.connect.json.JsonSerializer;
@@ -26,6 +33,7 @@ import org.apache.kafka.connect.json.JsonSerializer;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -80,7 +88,7 @@ public class DorisJsonConverter {
    * Convert this object, in the org.apache.kafka.connect.data format, into a JSON object,
    * returning both the schema and the converted object.
    */
-  public JsonNode convertToJson(Schema schema, Object value) {
+  public JsonNode convertToJson(Schema schema, Object value, Collection<UdfField> udfFields) {
     try {
       ObjectNode objectNode = (ObjectNode) convertToJsonMethod.invoke(jsonConverter, schema, value);
       if (objectNode.get(DEBEZIUM_DELETED_FIELD) != null) {
@@ -91,13 +99,45 @@ public class DorisJsonConverter {
       } else {
         objectNode.set(DORIS_DELETE_SIGN, TEXT_NODE_ZERO);
       }
+      // execute udf function
+      for (UdfField udfField : udfFields) {
+        Object obj =
+            udfField.inputColumnsExist() ? udfField.execute(objectNode) : udfField.execute();
+        objectNode.set(udfField.column(), toJsonNode(udfField.schema(), obj));
+      }
       return objectNode;
     } catch (IllegalAccessException | InvocationTargetException e) {
       throw new RuntimeException(e);
     }
   }
 
-  public byte[] serialize(String topic, Schema schema, Object value) {
-    return jsonSerializer.serialize(topic, convertToJson(schema, value));
+  public byte[] serialize(
+      String topic,
+      Schema schema,
+      Object value,
+      Collection<UdfField> udfFields
+  ) {
+    return jsonSerializer.serialize(topic, convertToJson(schema, value, udfFields));
+  }
+
+  private JsonNode toJsonNode(Schema schema, Object value) {
+    switch (schema.type()) {
+      case STRING:
+        return TextNode.valueOf((String) value);
+      case INT8:
+      case INT16:
+      case INT32:
+        return IntNode.valueOf((int) value);
+      case INT64:
+        return LongNode.valueOf((long) value);
+      case FLOAT32:
+        return FloatNode.valueOf((float) value);
+      case FLOAT64:
+        return DoubleNode.valueOf((double) value);
+      case BOOLEAN:
+        return BooleanNode.valueOf((boolean) value);
+      default:
+        throw new ConnectException("Unsupported type: " + schema.type());
+    }
   }
 }

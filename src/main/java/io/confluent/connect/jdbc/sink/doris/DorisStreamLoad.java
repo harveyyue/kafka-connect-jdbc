@@ -33,7 +33,9 @@ public class DorisStreamLoad {
   private static final Logger log = LoggerFactory.getLogger(DorisStreamLoad.class);
 
   private static final String STREAM_LOAD_URL = "http://%s/api/%s/%s/_stream_load";
+  private static final String DORIS_EXPECT_PERCENT = "100-continue";
   private static final String DORIS_DELETE_SIGN = "__DORIS_DELETE_SIGN__";
+  private static final String DORIS_LOAD_FORMAT = "json";
   private static final List<String> DORIS_SUCCESS_STATUS =
       Arrays.asList("Success", "Publish Timeout");
 
@@ -53,10 +55,11 @@ public class DorisStreamLoad {
     HttpPut httpPut = new HttpPut(url);
     httpPut.setHeader(dorisRestService.baseAuth());
     httpPut.addHeader("label", label);
-    httpPut.addHeader(HttpHeaders.EXPECT, "100-continue");
+    httpPut.addHeader(HttpHeaders.EXPECT, DORIS_EXPECT_PERCENT);
     httpPut.addHeader("hidden_columns", DORIS_DELETE_SIGN);
+    httpPut.addHeader("format", DORIS_LOAD_FORMAT);
     httpPut.addHeader("READ_JSON_BY_LINE", "true");
-    httpPut.addHeader("format", "json");
+    httpPut.addHeader(HttpHeaders.CONTENT_TYPE, "text/plain");
     httpPut.setEntity(entity);
 
     try (CloseableHttpResponse response = dorisRestService.getHttpClient().execute(httpPut)) {

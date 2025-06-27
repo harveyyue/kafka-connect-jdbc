@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
@@ -104,12 +104,16 @@ public class DorisBufferedRecords extends AbstractBufferedRecords {
     }
 
     // No need to return SinkRecords
-    return new ArrayList<>();
+    return Collections.emptyList();
   }
 
   private int insert(SinkRecord record) {
     byte[] json =
-        dorisJsonConverter.serialize(record.topic(), record.valueSchema(), record.value());
+        dorisJsonConverter.serialize(
+            record.topic(),
+            record.valueSchema(),
+            record.value(),
+            fieldsMetadata.udfFields.values());
     int recordSize = json.length;
     if (loadBatchFirstRecord) {
       loadBatchFirstRecord = false;
@@ -136,13 +140,13 @@ public class DorisBufferedRecords extends AbstractBufferedRecords {
   public List<SinkRecord> flush() throws SQLException {
     if (buffer.isEmpty()) {
       log.debug("Records is empty");
-      return new ArrayList<>();
+      return Collections.emptyList();
     }
 
     log.debug("Flushing {} buffered records", numOfRecords);
     dorisStreamLoad.load(generateBatchLabel(), new BatchBufferHttpEntity(buffer, bufferSizeBytes));
     buffer.clear();
-    return new ArrayList<>();
+    return Collections.emptyList();
   }
 
   @Override

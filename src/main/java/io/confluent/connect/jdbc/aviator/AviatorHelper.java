@@ -16,16 +16,25 @@
 package io.confluent.connect.jdbc.aviator;
 
 import com.googlecode.aviator.AviatorEvaluator;
-
+import com.googlecode.aviator.AviatorEvaluatorInstance;
 import io.confluent.connect.jdbc.aviator.function.CurrentTimestampFunction;
 import io.confluent.connect.jdbc.aviator.function.DateFunction;
+import io.confluent.connect.jdbc.aviator.function.JsonValueFunction;
+
+import java.util.Map;
 
 public class AviatorHelper {
 
+  private static final AviatorEvaluatorInstance aviatorEvaluatorInstance =
+      AviatorEvaluator.newInstance();
+
   static {
+    aviatorEvaluatorInstance.useLRUExpressionCache(1000);
+    aviatorEvaluatorInstance.setCachedExpressionByDefault(true);
     // register aviator functions
-    AviatorEvaluator.addFunction(new DateFunction());
-    AviatorEvaluator.addFunction(new CurrentTimestampFunction());
+    aviatorEvaluatorInstance.addFunction(new DateFunction());
+    aviatorEvaluatorInstance.addFunction(new CurrentTimestampFunction());
+    aviatorEvaluatorInstance.addFunction(new JsonValueFunction());
   }
 
   /**
@@ -35,6 +44,10 @@ public class AviatorHelper {
    * @return return the result of {@link Object} type
    */
   public static Object execute(String functionExpression) {
-    return AviatorEvaluator.execute(functionExpression);
+    return aviatorEvaluatorInstance.execute(functionExpression);
+  }
+
+  public static Object execute(String expression, Map<String, Object> env) {
+    return aviatorEvaluatorInstance.execute(expression, env);
   }
 }
