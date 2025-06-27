@@ -109,7 +109,11 @@ public class DorisBufferedRecords extends AbstractBufferedRecords {
 
   private int insert(SinkRecord record) {
     byte[] json =
-        dorisJsonConverter.serialize(record.topic(), record.valueSchema(), record.value());
+        dorisJsonConverter.serialize(
+            record.topic(),
+            record.valueSchema(),
+            record.value(),
+            fieldsMetadata.udfFields.values());
     int recordSize = json.length;
     if (loadBatchFirstRecord) {
       loadBatchFirstRecord = false;

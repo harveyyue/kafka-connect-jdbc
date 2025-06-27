@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -44,6 +43,8 @@ import io.confluent.connect.jdbc.util.TimeZoneValidator;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.config.types.Password;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class JdbcSinkConfig extends JdbcConfig {
 
@@ -582,7 +583,8 @@ public class JdbcSinkConfig extends JdbcConfig {
             RETRY_BACKOFF_MS_DISPLAY
         );
 
-  public static final Pattern UDF_PATTERN = Pattern.compile("(.*):(.*):(.*\\(.*\\)):(.*)");
+  private static final Logger log = LoggerFactory.getLogger(JdbcSinkConfig.class);
+  public static final Pattern COLON_PATTERN = Pattern.compile(":");
   public final String connectionUrl;
   public final String connectionUser;
   public final String connectionPassword;
@@ -668,14 +670,18 @@ public class JdbcSinkConfig extends JdbcConfig {
       return udfColumnList;
     }
     for (String udf : raw.split("\\|")) {
-      Matcher matcher = UDF_PATTERN.matcher(udf);
-      if (matcher.matches()) {
-        UdfField udfField = new UdfField(
-            matcher.group(1).trim(),
-            matcher.group(2).trim(),
-            matcher.group(3).trim(),
-            matcher.group(4).trim());
+      String[] elements = COLON_PATTERN.split(udf);
+      if (elements.length == 4) {
+        UdfField udfField = new UdfField(elements[0], elements[1], elements[2], elements[3]);
         udfColumnList.add(udfField);
+      } else if (elements.length >= 5) {
+        String[] inputColumns = new String[elements.length - 4];
+        System.arraycopy(elements, 4, inputColumns, 0, inputColumns.length);
+        UdfField udfField =
+            new UdfField(elements[0], elements[1], elements[2], elements[3], inputColumns);
+        udfColumnList.add(udfField);
+      } else {
+        log.warn("Parse udf field failed: {}", udf);
       }
     }
     return udfColumnList;

@@ -16,7 +16,10 @@
 package io.confluent.connect.jdbc.dialect;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.NullNode;
+import io.confluent.connect.jdbc.sink.JdbcSinkConfig;
 import io.confluent.connect.jdbc.sink.doris.DorisJsonConverter;
+import io.confluent.connect.jdbc.sink.metadata.UdfField;
 import io.confluent.connect.jdbc.util.AlterType;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
@@ -25,12 +28,16 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
+import static io.confluent.connect.jdbc.sink.JdbcSinkConfig.UDF_COLUMN_LIST_CONFIG;
 import static io.confluent.connect.jdbc.sink.doris.DorisJsonConverter.DEBEZIUM_DELETED_FIELD;
 import static io.confluent.connect.jdbc.sink.doris.DorisJsonConverter.DORIS_DELETE_SIGN;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public class DorisDatabaseDialectTest extends BaseDialectTest<DorisDatabaseDialect> {
 
@@ -45,6 +52,57 @@ public class DorisDatabaseDialectTest extends BaseDialectTest<DorisDatabaseDiale
   @Override
   protected DorisDatabaseDialect createDialect() {
     return new DorisDatabaseDialect(sourceConfigWithUrl("jdbc:mysql://something"));
+  }
+
+  @Test
+  public void testUdfColumnList() {
+    String currentTimestampFunction = "common_account_transfer_records:sync_time:current_timestamp():INT64";
+    String ifElseFunction = "common_account_transfer_records:site_id:if site_id == 'EU' { site_id } else { '' }:string:site_id";
+    String javaValueFunction = "common_account_transfer_records:intent_lang:json_value(response, '$.intent.language'):string:response";
+    String udf = String.format("%s|%s|%s", currentTimestampFunction, ifElseFunction, javaValueFunction);
+    JdbcSinkConfig jdbcSinkConfig = sinkConfigWithUrl("jdbc:mysql://something", UDF_COLUMN_LIST_CONFIG, udf);
+    List<UdfField> udfColumnList = jdbcSinkConfig.udfColumnList;
+    assertEquals(3, udfColumnList.size());
+    assertEquals(
+        "UdfField{table=common_account_transfer_records, column=site_id, udf=if site_id == 'EU' { site_id } else { '' }, type=string, inputColumns=[site_id], schema=Schema{STRING}}",
+        udfColumnList.get(1).toString());
+
+    // test udf functions
+    UdfField ifElseUdfField = udfColumnList.get(1);
+    UdfField jsonUdfField = udfColumnList.get(2);
+
+    // avro
+    String response = "{\"response_id\":\"r123\",\"intent\":{\"language\":\"en\"}}";
+    Schema schema = SchemaBuilder.struct()
+        .name("com.example.Person")
+        .field("site_id", Schema.STRING_SCHEMA)
+        .field("id", Schema.INT32_SCHEMA)
+        .field("response", Schema.OPTIONAL_STRING_SCHEMA)
+        .build();
+    Struct struct = new Struct(schema)
+        .put("site_id", "EU")
+        .put("id", 21)
+        .put("response", response);
+
+    String value = (String) ifElseUdfField.execute(struct);
+    assertEquals("EU", value);
+    assertTrue(ifElseUdfField.inputColumnsExist());
+    assertTrue(ifElseUdfField.inputColumnsValidate(schema));
+    assertEquals("en", jsonUdfField.execute(struct));
+
+    // test case-sensitive
+    Struct caseSensitiveStruct = new Struct(schema).put("site_id", "eu").put("id", 21);
+    value = (String) ifElseUdfField.execute(caseSensitiveStruct);
+    assertEquals("", value);
+
+    // test doris json converter
+    JsonNode jsonNodeWithoutResponse = converter.convertToJson(schema, caseSensitiveStruct, udfColumnList);
+    assertEquals(NullNode.getInstance(), jsonNodeWithoutResponse.get("intent_lang"));
+
+    JsonNode jsonNode = converter.convertToJson(schema, struct, udfColumnList);
+    assertEquals("EU", jsonNode.get("site_id").asText());
+    assertEquals("en", jsonNode.get("intent_lang").asText());
+    assertNotNull(jsonNode.get("sync_time"));
   }
 
   @Test
@@ -96,10 +154,10 @@ public class DorisDatabaseDialectTest extends BaseDialectTest<DorisDatabaseDiale
         .put("name", "cuba")
         .put(DEBEZIUM_DELETED_FIELD, false);
 
-    JsonNode jsonNode = converter.convertToJson(schemaA, valueA);
+    JsonNode jsonNode = converter.convertToJson(schemaA, valueA, Collections.emptyList());
     assertNull(jsonNode.get(DEBEZIUM_DELETED_FIELD));
-    assertEquals("0",  jsonNode.get(DORIS_DELETE_SIGN).asText());
-    byte[] bytes = converter.serialize(null, schemaA, valueA);
+    assertEquals("0", jsonNode.get(DORIS_DELETE_SIGN).asText());
+    byte[] bytes = converter.serialize(null, schemaA, valueA, Collections.emptyList());
     assertEquals(43, bytes.length);
   }
 }
