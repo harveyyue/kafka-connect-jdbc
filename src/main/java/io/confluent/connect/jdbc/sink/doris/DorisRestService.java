@@ -16,7 +16,6 @@
 package io.confluent.connect.jdbc.sink.doris;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -25,6 +24,7 @@ import io.confluent.connect.jdbc.sink.doris.entity.BackendV2;
 import io.confluent.connect.jdbc.sink.doris.entity.DorisEntity;
 import io.confluent.connect.jdbc.sink.doris.entity.Schema;
 import io.confluent.connect.jdbc.sink.doris.exception.DorisConnectException;
+import io.confluent.connect.jdbc.util.JsonUtils;
 import lombok.Getter;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.http.client.config.RequestConfig;
@@ -82,8 +82,7 @@ public class DorisRestService implements Serializable {
     this.username = jdbcSinkConfig.connectionUser;
     this.password = jdbcSinkConfig.connectionPassword;
     this.httpClient = buildHttpClient();
-    this.objectMapper = new ObjectMapper()
-        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    this.objectMapper = JsonUtils.OBJECT_MAPPER;
   }
 
   private String parseFeHostPort(JdbcSinkConfig jdbcSinkConfig) {

@@ -178,7 +178,9 @@ public class PreparedStatementBinder implements StatementBinder {
     for (final String fieldName : fieldsMetadata.nonKeyFieldNames) {
       UdfField udfField = fieldsMetadata.udfFields.get(fieldName);
       if (udfField != null) {
-        bindField(index++, udfField.schema(), udfField.execute(), udfField.column());
+        Object value =
+            udfField.inputColumnsExist() ? udfField.execute(valueStruct) : udfField.execute();
+        bindField(index++, udfField.schema(), value, udfField.column());
       } else {
         final Field field = record.valueSchema().field(fieldName);
         bindField(index++, field.schema(), valueStruct.get(field), fieldName);
