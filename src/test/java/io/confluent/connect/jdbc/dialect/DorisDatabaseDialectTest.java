@@ -59,13 +59,15 @@ public class DorisDatabaseDialectTest extends BaseDialectTest<DorisDatabaseDiale
     String currentTimestampFunction = "common_account_transfer_records:sync_time:current_timestamp():INT64";
     String ifElseFunction = "common_account_transfer_records:site_id:if site_id == 'EU' { site_id } else { '' }:string:site_id";
     String javaValueFunction = "common_account_transfer_records:intent_lang:json_value(response, '$.intent.language'):string:response";
-    String udf = String.format("%s|%s|%s", currentTimestampFunction, ifElseFunction, javaValueFunction);
+    String dateFunction = "test_table:_sink_timestamp:date(0,'yyyy-MM-dd HH:mm:ss'):string";
+    String udf = String.format("%s|%s|%s|%s", currentTimestampFunction, ifElseFunction, javaValueFunction, dateFunction);
     JdbcSinkConfig jdbcSinkConfig = sinkConfigWithUrl("jdbc:mysql://something", UDF_COLUMN_LIST_CONFIG, udf);
     List<UdfField> udfColumnList = jdbcSinkConfig.udfColumnList;
-    assertEquals(3, udfColumnList.size());
+    assertEquals(4, udfColumnList.size());
     assertEquals(
         "UdfField{table=common_account_transfer_records, column=site_id, udf=if site_id == 'EU' { site_id } else { '' }, type=string, inputColumns=[site_id], schema=Schema{STRING}}",
         udfColumnList.get(1).toString());
+    assertEquals("date(0,'yyyy-MM-dd HH:mm:ss')", udfColumnList.get(3).udf());
 
     // test udf functions
     UdfField ifElseUdfField = udfColumnList.get(1);

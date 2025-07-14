@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -585,6 +586,9 @@ public class JdbcSinkConfig extends JdbcConfig {
 
   private static final Logger log = LoggerFactory.getLogger(JdbcSinkConfig.class);
   public static final Pattern COLON_PATTERN = Pattern.compile(":");
+  public static final Pattern VERTICAL_BAR_PATTERN = Pattern.compile("\\|");
+  public static final Pattern UDF_PATTERN =
+      Pattern.compile("([^:]+):([^:]+):(.*\\(.*\\)|[^:]+):([^:]+)(:(.*))?");
   public final String connectionUrl;
   public final String connectionUser;
   public final String connectionPassword;
@@ -669,16 +673,20 @@ public class JdbcSinkConfig extends JdbcConfig {
     if (StringUtils.isBlank(raw)) {
       return udfColumnList;
     }
-    for (String udf : raw.split("\\|")) {
-      String[] elements = COLON_PATTERN.split(udf);
-      if (elements.length == 4) {
-        UdfField udfField = new UdfField(elements[0], elements[1], elements[2], elements[3]);
-        udfColumnList.add(udfField);
-      } else if (elements.length >= 5) {
-        String[] inputColumns = new String[elements.length - 4];
-        System.arraycopy(elements, 4, inputColumns, 0, inputColumns.length);
-        UdfField udfField =
-            new UdfField(elements[0], elements[1], elements[2], elements[3], inputColumns);
+    for (String udf : VERTICAL_BAR_PATTERN.split(raw)) {
+      Matcher matcher = UDF_PATTERN.matcher(udf);
+      if (matcher.matches()) {
+        String table = matcher.group(1);
+        String column = matcher.group(2);
+        String udfFunction = matcher.group(3);
+        String type =  matcher.group(4);
+        UdfField udfField;
+        if (matcher.group(6) != null) {
+          String[] inputColumns = COLON_PATTERN.split(matcher.group(6));
+          udfField = new UdfField(table, column, udfFunction, type, inputColumns);
+        } else {
+          udfField = new UdfField(table, column, udfFunction, type);
+        }
         udfColumnList.add(udfField);
       } else {
         log.warn("Parse udf field failed: {}", udf);

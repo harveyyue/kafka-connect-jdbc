@@ -118,6 +118,10 @@ public class UdfField {
     return true;
   }
 
+  public String udf() {
+    return udf;
+  }
+
   public Schema schema() {
     return schema;
   }
