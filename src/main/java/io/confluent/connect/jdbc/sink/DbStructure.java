@@ -36,7 +36,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 public class DbStructure {
   private static final Logger log = LoggerFactory.getLogger(DbStructure.class);
@@ -350,19 +349,18 @@ public class DbStructure {
           tableDefn.columnCount(),
           fields.size());
     }
-    fields =
-        fields.stream()
-            .filter(field -> field.schemaType().equals(Schema.Type.STRING)
-                && field.getSourceColumnType().isPresent()
-                && field.getSourceColumnSize().isPresent()
-                && MODIFY_TYPE.contains(field.getSourceColumnType().get().toUpperCase()))
-            .collect(Collectors.toSet());
     for (SinkRecordField field : fields) {
-      ColumnDefinition columnDefinition = tableDefn.definitionForColumn(field.name());
-      if (columnDefinition != null
-          && columnDefinition.typeName().equalsIgnoreCase(field.getSourceColumnType().get())
-          && columnDefinition.precision() != field.getSourceColumnSize().get()) {
-        modifyingFields.add(field);
+      // Currently, only support to modify varchar and char type
+      if (field.schemaType().equals(Schema.Type.STRING)
+          && field.getSourceColumnType().isPresent()
+          && field.getSourceColumnSize().isPresent()
+          && MODIFY_TYPE.contains(field.getSourceColumnType().get().toUpperCase())) {
+        ColumnDefinition columnDefinition = tableDefn.definitionForColumn(field.name());
+        if (columnDefinition != null
+            && columnDefinition.typeName().equalsIgnoreCase(field.getSourceColumnType().get())
+            && columnDefinition.precision() < field.getSourceColumnSize().get()) {
+          modifyingFields.add(field);
+        }
       }
     }
     return modifyingFields;
