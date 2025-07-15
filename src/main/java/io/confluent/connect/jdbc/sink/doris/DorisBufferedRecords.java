@@ -130,7 +130,8 @@ public class DorisBufferedRecords extends AbstractBufferedRecords {
 
   private String generateBatchLabel() {
     return String.format(
-        "%s_%s_%d",
+        "task_%s_%s_%s_%d",
+        config.getTaskId(),
         tableId.catalogName(),
         tableId.tableName(),
         System.currentTimeMillis());
