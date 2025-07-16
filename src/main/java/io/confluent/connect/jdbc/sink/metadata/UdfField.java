@@ -31,12 +31,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import static io.confluent.connect.jdbc.aviator.function.JsonValueFunction.JSON_VALUE_PATTERN;
 
 public class UdfField {
   private static final ObjectMapper OBJECT_MAPPER = JsonUtils.OBJECT_MAPPER;
+  public static final Pattern JSON_VALUE_FUNCTION_PATTERN = Pattern.compile(".*json_value(.*).*");
 
   private final String table;
   private final String column;
@@ -72,22 +72,18 @@ public class UdfField {
 
   public <T> Object execute(T value, BiFunction<T, String, Object> function) {
     Map<String, Object> env = new HashMap<>();
-    // reuse value for json_value function if needed
-    Map<String, JsonNode> cache = new HashMap<>();
     for (String inputColumn : inputColumns) {
       Object val = function.apply(value, inputColumn);
-      if (JSON_VALUE_PATTERN.matcher(udf).matches()) {
+      // TODO: should reuse value for json_value function if needed
+      if (JSON_VALUE_FUNCTION_PATTERN.matcher(udf).matches()) {
         if (val == null) {
           val = NullNode.getInstance();
         } else {
-          String finalVal = val.toString();
-          val = cache.computeIfAbsent(inputColumn, k -> {
-            try {
-              return OBJECT_MAPPER.readValue(finalVal, JsonNode.class);
-            } catch (IOException e) {
-              throw new ConnectException(e);
-            }
-          });
+          try {
+            val = OBJECT_MAPPER.readValue(val.toString(), JsonNode.class);
+          } catch (IOException e) {
+            throw new ConnectException(e);
+          }
         }
       }
       env.put(inputColumn, val);

@@ -30,11 +30,9 @@ import java.util.regex.Pattern;
 
 public class JsonValueFunction extends AbstractFunction {
 
-  private static final String FUNCTION_NAME = "json_value";
+  public static final String FUNCTION_NAME = "json_value";
   private static final String PATTERN_PREFIX = "$.";
   private static final Pattern DOT_PATTERN = Pattern.compile("\\.");
-  public static final Pattern JSON_VALUE_PATTERN =
-      Pattern.compile(String.format("%s(.*)", FUNCTION_NAME));
 
   /**
    * function like: json_value(question, '$.distinctId')

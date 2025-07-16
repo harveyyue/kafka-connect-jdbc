@@ -17,7 +17,6 @@ package io.confluent.connect.jdbc.aviator;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.TextNode;
 import com.googlecode.aviator.AviatorEvaluator;
 import org.junit.Before;
 import org.junit.Test;
@@ -29,7 +28,7 @@ import java.util.Map;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertNull;
 
 public class AviatorFunctionTest {
   private static final String INPUT_DATETIME = "2023-03-27T00:00:00+00:00";
@@ -81,13 +80,38 @@ public class AviatorFunctionTest {
     env.put("obj", jsonNode);
 
     Object value = AviatorHelper.execute("json_value(obj, '$.session.session_id')", env);
-    assertEquals("abc123", ((TextNode) value).asText());
+    assertEquals("abc123", value);
+
+    Object coalesce = AviatorHelper.execute("coalesce(json_value(obj, '$.session.id'), '')", env);
+    assertEquals("", coalesce);
+
+    Object coalesce2 = AviatorHelper.execute("coalesce(json_value(obj, '$.session.session_id'), '')", env);
+    assertEquals("abc123", coalesce2);
 
     Object nestedPathValue = AviatorHelper.execute("json_value(obj, '$.session.session_id_')", env);
-    assertTrue(((JsonNode) nestedPathValue).isNull());
+    assertNull(nestedPathValue);
 
     Object pathValue = AviatorHelper.execute("json_value(obj, '$.name2')", env);
-    assertTrue(((JsonNode) pathValue).isNull());
+    assertNull(pathValue);
+  }
+
+  @Test
+  public void testCoalesceFunction() {
+    // not support: coalesce(null, '')
+    // com.googlecode.aviator.exception.ExpressionSyntaxErrorException: Syntax error: illegal identifier: null at 9, lineNumber: 1, token : [type='variable',lexeme='null',index=9],
+    // while parsing expression: `
+    // coalesce(null^^^
+    // `
+    // assertEquals("", AviatorHelper.execute("coalesce(null, '')"));
+
+    assertEquals(1L, AviatorHelper.execute("coalesce(1, 1)"));
+    assertEquals("1", AviatorHelper.execute("coalesce('1', '1')"));
+
+    Map<String, Object> env = AviatorEvaluator.newEnv("col", null);
+    Object value = AviatorHelper.execute("coalesce(col, 1)", env);
+    assertEquals(1L, value);
+    Object strValue = AviatorHelper.execute("coalesce(col, '1')", env);
+    assertEquals("1", strValue);
   }
 
   @Test

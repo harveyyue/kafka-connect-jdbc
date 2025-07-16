@@ -59,19 +59,22 @@ public class DorisDatabaseDialectTest extends BaseDialectTest<DorisDatabaseDiale
     String currentTimestampFunction = "common_account_transfer_records:sync_time:current_timestamp():INT64";
     String ifElseFunction = "common_account_transfer_records:site_id:if site_id == 'EU' { site_id } else { '' }:string:site_id";
     String javaValueFunction = "common_account_transfer_records:intent_lang:json_value(response, '$.intent.language'):string:response";
+    String coalesceFunction = "common_account_transfer_records:intent_lang2:coalesce(json_value(response, '$.intent.language'), ''):string:response";
+    String blankCoalesceFunction = "common_account_transfer_records:intent_lang3:coalesce(json_value(response, '$.intent.language2'), ''):string:response";
     String dateFunction = "test_table:_sink_timestamp:date(0,'yyyy-MM-dd HH:mm:ss'):string";
-    String udf = String.format("%s|%s|%s|%s", currentTimestampFunction, ifElseFunction, javaValueFunction, dateFunction);
+    String udf = String.format("%s|%s|%s|%s|%s|%s", currentTimestampFunction, ifElseFunction, javaValueFunction, coalesceFunction, blankCoalesceFunction, dateFunction);
     JdbcSinkConfig jdbcSinkConfig = sinkConfigWithUrl("jdbc:mysql://something", UDF_COLUMN_LIST_CONFIG, udf);
     List<UdfField> udfColumnList = jdbcSinkConfig.udfColumnList;
-    assertEquals(4, udfColumnList.size());
+    assertEquals(6, udfColumnList.size());
     assertEquals(
         "UdfField{table=common_account_transfer_records, column=site_id, udf=if site_id == 'EU' { site_id } else { '' }, type=string, inputColumns=[site_id], schema=Schema{STRING}}",
         udfColumnList.get(1).toString());
-    assertEquals("date(0,'yyyy-MM-dd HH:mm:ss')", udfColumnList.get(3).udf());
+    assertEquals("date(0,'yyyy-MM-dd HH:mm:ss')", udfColumnList.get(5).udf());
 
     // test udf functions
     UdfField ifElseUdfField = udfColumnList.get(1);
     UdfField jsonUdfField = udfColumnList.get(2);
+    UdfField coalesceUdfField = udfColumnList.get(3);
 
     // avro
     String response = "{\"response_id\":\"r123\",\"intent\":{\"language\":\"en\"}}";
@@ -91,6 +94,7 @@ public class DorisDatabaseDialectTest extends BaseDialectTest<DorisDatabaseDiale
     assertTrue(ifElseUdfField.inputColumnsExist());
     assertTrue(ifElseUdfField.inputColumnsValidate(schema));
     assertEquals("en", jsonUdfField.execute(struct));
+    assertEquals("en", coalesceUdfField.execute(struct));
 
     // test case-sensitive
     Struct caseSensitiveStruct = new Struct(schema).put("site_id", "eu").put("id", 21);
@@ -104,6 +108,8 @@ public class DorisDatabaseDialectTest extends BaseDialectTest<DorisDatabaseDiale
     JsonNode jsonNode = converter.convertToJson(schema, struct, udfColumnList);
     assertEquals("EU", jsonNode.get("site_id").asText());
     assertEquals("en", jsonNode.get("intent_lang").asText());
+    assertEquals("en", jsonNode.get("intent_lang2").asText());
+    assertEquals("", jsonNode.get("intent_lang3").asText());
     assertNotNull(jsonNode.get("sync_time"));
   }
 

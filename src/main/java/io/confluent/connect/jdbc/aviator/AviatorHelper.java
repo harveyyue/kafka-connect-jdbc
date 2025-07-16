@@ -17,6 +17,7 @@ package io.confluent.connect.jdbc.aviator;
 
 import com.googlecode.aviator.AviatorEvaluator;
 import com.googlecode.aviator.AviatorEvaluatorInstance;
+import io.confluent.connect.jdbc.aviator.function.CoalesceFunction;
 import io.confluent.connect.jdbc.aviator.function.CurrentTimestampFunction;
 import io.confluent.connect.jdbc.aviator.function.DateFunction;
 import io.confluent.connect.jdbc.aviator.function.JsonValueFunction;
@@ -35,6 +36,7 @@ public class AviatorHelper {
     aviatorEvaluatorInstance.addFunction(new DateFunction());
     aviatorEvaluatorInstance.addFunction(new CurrentTimestampFunction());
     aviatorEvaluatorInstance.addFunction(new JsonValueFunction());
+    aviatorEvaluatorInstance.addFunction(new CoalesceFunction());
   }
 
   /**
