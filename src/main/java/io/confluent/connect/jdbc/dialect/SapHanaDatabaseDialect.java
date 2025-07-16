@@ -15,6 +15,7 @@
 
 package io.confluent.connect.jdbc.dialect;
 
+import io.confluent.connect.jdbc.util.BuilderType;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.connect.data.Date;
 import org.apache.kafka.connect.data.Decimal;
@@ -127,7 +128,7 @@ public class SapHanaDatabaseDialect extends GenericDatabaseDialect {
       TableId table,
       Collection<SinkRecordField> fields
   ) {
-    ExpressionBuilder builder = expressionBuilder();
+    ExpressionBuilder builder = expressionBuilder(BuilderType.ALTER_ADD);
     builder.append("ALTER TABLE ");
     builder.append(table);
     builder.append(" ADD(");

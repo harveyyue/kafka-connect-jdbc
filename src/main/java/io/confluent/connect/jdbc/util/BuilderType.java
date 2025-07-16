@@ -15,6 +15,6 @@
 
 package io.confluent.connect.jdbc.util;
 
-public enum AlterType {
-  ADD, MODIFY
+public enum BuilderType {
+  CREATE, DROP, ALTER_ADD, ALTER_MODIFY, SELECT, UPDATE, DELETE
 }

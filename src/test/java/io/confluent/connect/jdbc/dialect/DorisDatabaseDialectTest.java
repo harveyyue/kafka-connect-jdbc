@@ -19,14 +19,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import io.confluent.connect.jdbc.sink.JdbcSinkConfig;
 import io.confluent.connect.jdbc.sink.doris.DorisJsonConverter;
+import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
 import io.confluent.connect.jdbc.sink.metadata.UdfField;
-import io.confluent.connect.jdbc.util.AlterType;
+import io.confluent.connect.jdbc.util.BuilderType;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -143,11 +145,31 @@ public class DorisDatabaseDialectTest extends BaseDialectTest<DorisDatabaseDiale
   }
 
   @Test
+  public void shouldBuildMultipleAlterWithoutDefaultValueStatement() {
+    List<String> alteredStatements = dialect.buildAlterTable(tableId, alterFieldsWithoutDefaultValue());
+    List<String> expectedStatements = Arrays.asList(
+        "ALTER TABLE `myTable` ADD COLUMN `foo` INT NOT NULL DEFAULT '0'",
+        "ALTER TABLE `myTable` ADD COLUMN `bar` STRING NOT NULL DEFAULT ''");
+    assertEquals(2, alteredStatements.size());
+    assertEquals(alteredStatements, expectedStatements);
+  }
+
+  @Test
   public void shouldBuildMultipleAlterModifyStatement() {
-    List<String> alteredStatements = dialect.buildAlterTable(tableId, alterFields(), dialect.expressionBuilder().setAlterType(AlterType.MODIFY));
+    List<String> alteredStatements = dialect.buildAlterTable(tableId, alterFields(), dialect.expressionBuilder(BuilderType.ALTER_MODIFY));
     List<String> expectedStatements = Arrays.asList(
         "ALTER TABLE `myTable` MODIFY COLUMN `foo` INT DEFAULT '42'",
         "ALTER TABLE `myTable` MODIFY COLUMN `bar` STRING DEFAULT 'I'm bar'");
+    assertEquals(2, alteredStatements.size());
+    assertEquals(alteredStatements, expectedStatements);
+  }
+
+  @Test
+  public void shouldBuildMultipleAlterModifyWithoutDefaultValueStatement() {
+    List<String> alteredStatements = dialect.buildAlterTable(tableId, alterFieldsWithoutDefaultValue(), dialect.expressionBuilder(BuilderType.ALTER_MODIFY));
+    List<String> expectedStatements = Arrays.asList(
+        "ALTER TABLE `myTable` MODIFY COLUMN `foo` INT NOT NULL DEFAULT '0'",
+        "ALTER TABLE `myTable` MODIFY COLUMN `bar` STRING NOT NULL DEFAULT ''");
     assertEquals(2, alteredStatements.size());
     assertEquals(alteredStatements, expectedStatements);
   }
@@ -167,5 +189,14 @@ public class DorisDatabaseDialectTest extends BaseDialectTest<DorisDatabaseDiale
     assertEquals("0", jsonNode.get(DORIS_DELETE_SIGN).asText());
     byte[] bytes = converter.serialize(null, schemaA, valueA, Collections.emptyList());
     assertEquals(43, bytes.length);
+  }
+
+  protected List<SinkRecordField> alterFieldsWithoutDefaultValue() {
+    List<SinkRecordField> alterFields = new ArrayList<>();
+    alterFields.add(new SinkRecordField(
+        SchemaBuilder.int32().build(), "foo", false));
+    alterFields.add(new SinkRecordField(
+        SchemaBuilder.string().build(), "bar", false));
+    return alterFields;
   }
 }

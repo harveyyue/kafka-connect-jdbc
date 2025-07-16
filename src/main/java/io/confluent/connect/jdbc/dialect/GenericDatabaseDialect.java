@@ -18,7 +18,6 @@ package io.confluent.connect.jdbc.dialect;
 import java.time.ZoneOffset;
 import java.util.TimeZone;
 
-import io.confluent.connect.jdbc.util.AlterType;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.config.types.Password;
@@ -82,6 +81,7 @@ import io.confluent.connect.jdbc.source.JdbcSourceConnectorConfig.TimestampGranu
 import io.confluent.connect.jdbc.source.JdbcSourceConnectorConfig.TransactionIsolationMode;
 import io.confluent.connect.jdbc.source.JdbcSourceTaskConfig;
 import io.confluent.connect.jdbc.source.TimestampIncrementingCriteria;
+import io.confluent.connect.jdbc.util.BuilderType;
 import io.confluent.connect.jdbc.util.ColumnDefinition;
 import io.confluent.connect.jdbc.util.ColumnDefinition.Mutability;
 import io.confluent.connect.jdbc.util.ColumnDefinition.Nullability;
@@ -548,6 +548,11 @@ public class GenericDatabaseDialect implements DatabaseDialect {
     return identifierRules().expressionBuilder()
                             .setQuoteIdentifiers(quoteSqlIdentifiers)
                             .setDialect(name());
+  }
+
+  @Override
+  public ExpressionBuilder expressionBuilder(BuilderType builderType) {
+    return expressionBuilder().setBuilderType(builderType);
   }
 
   /**
@@ -1840,7 +1845,7 @@ public class GenericDatabaseDialect implements DatabaseDialect {
       TableId table,
       Collection<SinkRecordField> fields
   ) {
-    return buildAlterTable(table, fields, expressionBuilder());
+    return buildAlterTable(table, fields, expressionBuilder(BuilderType.ALTER_ADD));
   }
 
   @Override
@@ -1855,8 +1860,9 @@ public class GenericDatabaseDialect implements DatabaseDialect {
       if (newlines) {
         expressionBuilder.appendNewLine();
       }
-      String alterType = expressionBuilder.alterType.equals(AlterType.ADD) ? "ADD " : "MODIFY ";
-      expressionBuilder.append(alterType);
+      String builderType =
+          expressionBuilder.buildType.equals(BuilderType.ALTER_ADD) ? "ADD " : "MODIFY ";
+      expressionBuilder.append(builderType);
       if (builder.dialect.equals("Doris")) {
         builder.append("COLUMN ");
       }

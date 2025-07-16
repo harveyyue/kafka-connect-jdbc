@@ -18,7 +18,7 @@ package io.confluent.connect.jdbc.sink;
 import io.confluent.connect.jdbc.dialect.DatabaseDialect;
 import io.confluent.connect.jdbc.sink.metadata.FieldsMetadata;
 import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
-import io.confluent.connect.jdbc.util.AlterType;
+import io.confluent.connect.jdbc.util.BuilderType;
 import io.confluent.connect.jdbc.util.ColumnDefinition;
 import io.confluent.connect.jdbc.util.TableDefinition;
 import io.confluent.connect.jdbc.util.TableDefinitions;
@@ -235,7 +235,7 @@ public class DbStructure {
     if (!modifyingFields.isEmpty()) {
       verifyAlterFields(modifyingFields, tableId, type, "modifying");
       final List<String> modifiedTableColumnStatements = dbDialect.buildAlterTable(
-          tableId, modifyingFields, dbDialect.expressionBuilder().setAlterType(AlterType.MODIFY));
+          tableId, modifyingFields, dbDialect.expressionBuilder(BuilderType.ALTER_MODIFY));
       log.info(
           "Amending {} to add modifying fields:{} maxRetries:{} with SQL: {}",
           type,

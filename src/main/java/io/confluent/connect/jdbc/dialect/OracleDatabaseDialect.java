@@ -20,6 +20,7 @@ import io.confluent.connect.jdbc.sink.JdbcSinkConfig.PrimaryKeyMode;
 import io.confluent.connect.jdbc.sink.PreparedStatementBinder;
 import io.confluent.connect.jdbc.sink.metadata.FieldsMetadata;
 import io.confluent.connect.jdbc.sink.metadata.SchemaPair;
+import io.confluent.connect.jdbc.util.BuilderType;
 import io.confluent.connect.jdbc.util.ColumnDefinition;
 import io.confluent.connect.jdbc.util.TableDefinition;
 import java.io.ByteArrayInputStream;
@@ -246,7 +247,7 @@ public class OracleDatabaseDialect extends GenericDatabaseDialect {
       TableId table,
       Collection<SinkRecordField> fields
   ) {
-    ExpressionBuilder builder = expressionBuilder();
+    ExpressionBuilder builder = expressionBuilder(BuilderType.ALTER_ADD);
     builder.append("ALTER TABLE ");
     builder.append(table);
     builder.append(" ADD(");

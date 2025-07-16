@@ -241,7 +241,7 @@ public class ExpressionBuilder {
   private final IdentifierRules rules;
   private QuoteMethod quoteSqlIdentifiers = DEFAULT_QUOTE_METHOD;
   public String dialect;
-  public AlterType alterType = AlterType.ADD;
+  public BuilderType buildType;
 
   /**
    * Create a new expression builder with the default {@link IdentifierRules}.
@@ -263,12 +263,12 @@ public class ExpressionBuilder {
       IdentifierRules rules,
       QuoteMethod quoteSqlIdentifiers,
       String dialect,
-      AlterType alterType
+      BuilderType buildType
   ) {
     this.rules = rules;
     this.quoteSqlIdentifiers = quoteSqlIdentifiers;
     this.dialect = dialect;
-    this.alterType = alterType;
+    this.buildType = buildType;
   }
 
   /**
@@ -281,7 +281,7 @@ public class ExpressionBuilder {
         builder.rules,
         builder.quoteSqlIdentifiers,
         builder.dialect,
-        builder.alterType);
+        builder.buildType);
   }
 
   /**
@@ -321,8 +321,8 @@ public class ExpressionBuilder {
   /**
    * Indentify the table alter type for expression builder
    */
-  public ExpressionBuilder setAlterType(AlterType alterType) {
-    this.alterType = alterType;
+  public ExpressionBuilder setBuilderType(BuilderType buildType) {
+    this.buildType = buildType;
     return this;
   }
 

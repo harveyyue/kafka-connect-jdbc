@@ -16,6 +16,7 @@
 package io.confluent.connect.jdbc.dialect;
 
 import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
+import io.confluent.connect.jdbc.util.BuilderType;
 import io.confluent.connect.jdbc.util.DateTimeUtils;
 import io.confluent.connect.jdbc.util.ExpressionBuilder;
 import io.confluent.connect.jdbc.util.TableId;
@@ -152,7 +153,20 @@ public class DorisDatabaseDialect extends MySqlDatabaseDialect {
     } else if (isColumnOptional(f)) {
       builder.append(" NULL");
     } else {
-      builder.append(" NOT NULL");
+      // doris not support adding not null constraint column without default value
+      if (builder.buildType != null
+          && (builder.buildType.equals(BuilderType.ALTER_ADD)
+          || builder.buildType.equals(BuilderType.ALTER_MODIFY))) {
+        builder.append(" NOT NULL DEFAULT ");
+        formatColumnDefaultValue(
+            builder,
+            f.schemaName(),
+            f.schemaParameters(),
+            f.schemaType()
+        );
+      } else {
+        builder.append(" NOT NULL");
+      }
     }
   }
 
@@ -214,6 +228,28 @@ public class DorisDatabaseDialect extends MySqlDatabaseDialect {
         builder.appendStringQuoted((Boolean) value ? '1' : '0');
         break;
       default:
+        break;
+    }
+  }
+
+  private void formatColumnDefaultValue(
+      ExpressionBuilder builder,
+      String schemaName,
+      Map<String, String> schemaParameters,
+      Schema.Type type
+  ) {
+    switch (type) {
+      case INT8:
+      case INT16:
+      case INT32:
+      case INT64:
+      case FLOAT32:
+      case FLOAT64:
+      case BOOLEAN:
+        builder.appendStringQuoted(0);
+        break;
+      default:
+        builder.appendStringQuoted("");
         break;
     }
   }
