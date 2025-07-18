@@ -164,12 +164,17 @@ public class MySqlDatabaseDialect extends GenericDatabaseDialect {
       case STRING:
         Optional<String> dataTypeOpt = field.getSourceColumnType();
         if (dataTypeOpt.isPresent()) {
-          if (dataTypeOpt.get().equalsIgnoreCase("DECIMAL")
-              || dataTypeOpt.get().equalsIgnoreCase("TIMESTAMP")) {
+          String originType = dataTypeOpt.get().toUpperCase();
+          // DECIMAL, NUMERIC and FIXED type contain keywords: UNSIGNED ZEROFILL
+          if (originType.contains("DECIMAL")
+              || originType.contains("NUMERIC")
+              || originType.contains("FIXED")
+              || originType.contains("TIMESTAMP")
+              || originType.equals("ENUM")
+              || originType.equals("SET")) {
             return "VARCHAR(255)";
-          }
-          if (lengthOpt.isPresent()) {
-            return String.format("%s(%d)", dataTypeOpt.get(), lengthOpt.get());
+          } else if (lengthOpt.isPresent()) {
+            return String.format("%s(%d)", originType, lengthOpt.get());
           }
         }
         return "TEXT";

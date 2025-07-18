@@ -23,8 +23,10 @@ import io.confluent.connect.jdbc.util.TableId;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.connect.data.Date;
 import org.apache.kafka.connect.data.Decimal;
+import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Time;
+import org.apache.kafka.connect.errors.ConnectException;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -150,7 +152,7 @@ public class DorisDatabaseDialect extends MySqlDatabaseDialect {
           f.schemaType(),
           f.defaultValue()
       );
-    } else if (isColumnOptional(f)) {
+    } else if (isColumnOptional(f) || f.schemaType().equals(Schema.Type.STRUCT)) {
       builder.append(" NULL");
     } else {
       // doris not support adding not null constraint column without default value
@@ -172,13 +174,41 @@ public class DorisDatabaseDialect extends MySqlDatabaseDialect {
 
   @Override
   protected String getSqlType(SinkRecordField field) {
-    if (field.schemaType().equals(Schema.Type.BYTES)) {
-      return "STRING";
+    // doris is not supported bytes type
+    switch (field.schemaType()) {
+      case BYTES:
+        return "STRING";
+      case STRUCT:
+        ExpressionBuilder structBuilder = expressionBuilder();
+        structBuilder.append("STRUCT<");
+        // STRUCT<field_name:field_type [COMMENT 'comment_string'], ... >
+        // Note: The name and number of Fields in a Struct are fixed and are always Nullable.
+        List<Field> fields = field.schema().fields();
+        for (int i = 0; i < fields.size(); i++) {
+          Field structField = fields.get(i);
+          if (structField.schema().type().equals(Schema.Type.STRUCT)) {
+            throw new ConnectException(
+                "Doris STRUCT type doesn't support the nested sub STRUCT type");
+          }
+          structBuilder.append(structField.name());
+          structBuilder.append(":");
+          structBuilder.append(
+              getSqlType(new SinkRecordField(structField.schema(), structField.name(), false)));
+          if (i != fields.size() - 1) {
+            structBuilder.append(", ");
+          }
+        }
+        structBuilder.append(">");
+        return structBuilder.toString();
+      case FLOAT64:
+        return "DOUBLE";
+      default:
     }
+
     String sqlType = super.getSqlType(field);
     if (sqlType.equalsIgnoreCase("TEXT")
         || sqlType.equalsIgnoreCase("TIME(3)")) {
-      // Currently, doris is not supported time type
+      // doris is not supported time type
       sqlType = "STRING";
     }
     return sqlType;
@@ -254,4 +284,3 @@ public class DorisDatabaseDialect extends MySqlDatabaseDialect {
     }
   }
 }
-

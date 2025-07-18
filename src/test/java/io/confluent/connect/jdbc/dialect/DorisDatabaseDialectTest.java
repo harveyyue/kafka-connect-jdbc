@@ -31,7 +31,9 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static io.confluent.connect.jdbc.sink.JdbcSinkConfig.UDF_COLUMN_LIST_CONFIG;
 import static io.confluent.connect.jdbc.sink.doris.DorisJsonConverter.DEBEZIUM_DELETED_FIELD;
@@ -127,10 +129,25 @@ public class DorisDatabaseDialectTest extends BaseDialectTest<DorisDatabaseDiale
             "`c6` STRING DEFAULT '00:00:00.000',\n" +
             "`c7` DATETIME(3) DEFAULT '2001-03-15 00:00:00.000',\n" +
             "`c8` STRING NULL,\n" +
-            "`c9` TINYINT DEFAULT '1') ENGINE=OLAP\n" +
+            "`c9` TINYINT DEFAULT '1',\n" +
+            "`_geometry` STRUCT<wkb:STRING, srid:INT> NULL) ENGINE=OLAP\n" +
             "UNIQUE KEY(`c1`)\n" +
             "DISTRIBUTED BY HASH(`c1`) BUCKETS AUTO";
-    String sql = dialect.buildCreateTableStatement(tableId, buildSinkRecordFieldsIncludingSchemaParameters());
+    // struct field
+    List<SinkRecordField> sinkRecordFields = buildSinkRecordFieldsIncludingSchemaParameters();
+    Map<String, String> parameters = new HashMap<>();
+    parameters.put("__debezium.source.column.type", "GEOMETRY");
+    parameters.put("__debezium.source.column.name", "_geometry");
+    Schema geometrySchema =
+        SchemaBuilder
+            .struct()
+            .field("wkb", Schema.OPTIONAL_BYTES_SCHEMA)
+            .field("srid", Schema.OPTIONAL_INT32_SCHEMA)
+            .parameters(parameters)
+            .build();
+    SinkRecordField geometrySinkRecordField = new SinkRecordField(geometrySchema, "_geometry", false);
+    sinkRecordFields.add(geometrySinkRecordField);
+    String sql = dialect.buildCreateTableStatement(tableId, sinkRecordFields);
     assertEquals(expected, sql);
   }
 
