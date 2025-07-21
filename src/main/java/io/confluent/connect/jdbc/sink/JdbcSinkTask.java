@@ -33,7 +33,9 @@ import java.util.stream.Collectors;
 
 import io.confluent.connect.jdbc.dialect.DatabaseDialect;
 import io.confluent.connect.jdbc.dialect.DatabaseDialects;
+import io.confluent.connect.jdbc.dialect.DorisDatabaseDialect;
 import io.confluent.connect.jdbc.metrics.JdbcSinkMetrics;
+import io.confluent.connect.jdbc.sink.doris.DorisDbWriter;
 import io.confluent.connect.jdbc.util.Clock;
 import io.confluent.connect.jdbc.util.StringUtils;
 import io.confluent.connect.jdbc.util.Version;
@@ -44,7 +46,7 @@ public class JdbcSinkTask extends SinkTask {
   ErrantRecordReporter reporter;
   DatabaseDialect dialect;
   JdbcSinkConfig config;
-  JdbcDbWriter writer;
+  DbWriter writer;
   int remainingRetries;
   JdbcSinkMetrics jdbcSinkMetrics;
   Clock clock = Clock.system();
@@ -76,7 +78,15 @@ public class JdbcSinkTask extends SinkTask {
     }
     final DbStructure dbStructure = new DbStructure(dialect);
     log.info("Initializing writer using SQL dialect: {}", dialect.getClass().getSimpleName());
-    writer = new JdbcDbWriter(config, dialect, dbStructure);
+    if (isDorisDialect()) {
+      writer = new DorisDbWriter(config, dialect, dbStructure);
+    } else {
+      writer = new JdbcDbWriter(config, dialect, dbStructure);
+    }
+  }
+
+  private boolean isDorisDialect() {
+    return dialect instanceof DorisDatabaseDialect;
   }
 
   @Override
@@ -101,7 +111,7 @@ public class JdbcSinkTask extends SinkTask {
     try {
       writer.write(records);
     } catch (TableAlterOrCreateException tace) {
-      if (reporter != null) {
+      if (reporter != null && !isDorisDialect()) {
         unrollAndRetry(records);
       } else {
         throw tace;
@@ -125,7 +135,7 @@ public class JdbcSinkTask extends SinkTask {
         context.timeout(config.retryBackoffMs);
         throw new RetriableException(sqlAllMessagesException);
       } else {
-        if (reporter != null) {
+        if (reporter != null && !isDorisDialect()) {
           unrollAndRetry(records);
         } else {
           log.error(
@@ -181,6 +191,16 @@ public class JdbcSinkTask extends SinkTask {
   @Override
   public void flush(Map<TopicPartition, OffsetAndMetadata> map) {
     // Not necessary
+  }
+
+  @Override
+  public Map<TopicPartition, OffsetAndMetadata> preCommit(
+      Map<TopicPartition, OffsetAndMetadata> offsets
+  ) {
+    if (isDorisDialect()) {
+      return writer.preCommit();
+    }
+    return super.preCommit(offsets);
   }
 
   public void stop() {

@@ -21,6 +21,8 @@ import io.confluent.connect.jdbc.sink.DbStructure;
 import io.confluent.connect.jdbc.sink.JdbcSinkConfig;
 import io.confluent.connect.jdbc.sink.TableAlterOrCreateException;
 import io.confluent.connect.jdbc.util.TableId;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.utils.ThreadUtils;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
@@ -30,18 +32,29 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class DorisBufferedRecords extends AbstractBufferedRecords {
   private static final Logger log = LoggerFactory.getLogger(DorisBufferedRecords.class);
 
   private static final String LINE_DELIMITER = "\n";
 
-  private final List<byte[]> buffer = new ArrayList<>();
+  private final Object obj = new Object();
+  private final Map<TopicPartition, Long> currentOffsets = new HashMap<>();
+  private final Map<TopicPartition, Long> offsetToCommit = new HashMap<>();
+  private final BlockingQueue<byte[]> buffer = new ArrayBlockingQueue<>(config.batchSize);
   private final DorisJsonConverter dorisJsonConverter;
   private final DorisStreamLoad dorisStreamLoad;
   private final byte[] lineDelimiter;
+  private final ScheduledExecutorService scheduler;
 
   private boolean loadBatchFirstRecord = true;
   private long bufferSizeBytes = 0;
@@ -59,6 +72,14 @@ public class DorisBufferedRecords extends AbstractBufferedRecords {
     this.dorisJsonConverter = DorisJsonConverter.getInstance();
     this.dorisStreamLoad = new DorisStreamLoad(dorisRestService, tableId);
     this.lineDelimiter = LINE_DELIMITER.getBytes();
+    this.scheduler = Executors.newSingleThreadScheduledExecutor(
+        ThreadUtils.createThreadFactory(threadName(), false));
+
+    scheduler.scheduleWithFixedDelay(
+        this::doFlush,
+        config.dorisBufferFlushIntervalMs,
+        config.dorisBufferFlushIntervalMs,
+        TimeUnit.MILLISECONDS);
   }
 
   @Override
@@ -85,7 +106,6 @@ public class DorisBufferedRecords extends AbstractBufferedRecords {
     if (schemaChanged) {
       // Each batch needs to have the same schemas, so get the buffered records out
       flush();
-      close();
 
       // re-initialize everything that depends on the record schema
       fieldsMetadata = extractFieldsMetadata(record);
@@ -113,22 +133,51 @@ public class DorisBufferedRecords extends AbstractBufferedRecords {
             record.valueSchema(),
             record.value(),
             fieldsMetadata.udfFields.values());
-    int recordSize = json.length;
-    if (loadBatchFirstRecord) {
-      loadBatchFirstRecord = false;
-    } else {
-      buffer.add(lineDelimiter);
-      recordSize += lineDelimiter.length;
+
+    synchronized (obj) {
+      try {
+        byte[] result;
+        if (loadBatchFirstRecord) {
+          result = json;
+          loadBatchFirstRecord = false;
+        } else {
+          result = concat(lineDelimiter, json);
+        }
+        int recordSize = result.length;
+        buffer.put(result);
+        bufferSizeBytes += recordSize;
+        numOfRecords++;
+        currentOffsets.put(
+            new TopicPartition(record.topic(), record.kafkaPartition()), record.kafkaOffset());
+        return recordSize;
+      } catch (InterruptedException e) {
+        log.error("Unexpect error.", e);
+        return 0;
+      }
     }
-    buffer.add(json);
-    bufferSizeBytes += recordSize;
-    numOfRecords++;
-    return recordSize;
+  }
+
+  private byte[] concat(byte[] first, byte[] second) {
+    byte[] result = new byte[first.length + second.length];
+    System.arraycopy(first, 0, result, 0, first.length);
+    System.arraycopy(second, 0, result, first.length, second.length);
+    return result;
+  }
+
+  private String threadName() {
+    String prefix = String.format(
+        "%s-%s-%s-%s-doris-batch-load",
+        config.getConnectorName(),
+        config.getTaskId(),
+        tableId.catalogName(),
+        tableId.tableName());
+    return prefix + "-%d";
   }
 
   private String generateBatchLabel() {
     return String.format(
-        "task_%s_%s_%s_%d",
+        "%s_%s_%s_%s_%d",
+        config.getConnectorName(),
         config.getTaskId(),
         tableId.catalogName(),
         tableId.tableName(),
@@ -137,22 +186,38 @@ public class DorisBufferedRecords extends AbstractBufferedRecords {
 
   @Override
   public List<SinkRecord> flush() throws SQLException {
+    doFlush();
+    return Collections.emptyList();
+  }
+
+  private void doFlush() {
     if (buffer.isEmpty()) {
       log.debug("Records is empty");
-      return Collections.emptyList();
+      return;
     }
 
-    log.debug("Flushing {} buffered records", numOfRecords);
-    dorisStreamLoad.load(generateBatchLabel(), new BatchBufferHttpEntity(buffer, bufferSizeBytes));
-    // cleanup
-    loadBatchFirstRecord = true;
-    bufferSizeBytes = 0;
-    numOfRecords = 0;
-    buffer.clear();
-    return Collections.emptyList();
+    log.debug("Flushing {} buffered records for table ID: {}", numOfRecords, tableId);
+    synchronized (obj) {
+      List<byte[]> batch = new ArrayList<>();
+      buffer.drainTo(batch, buffer.size());
+      dorisStreamLoad.load(generateBatchLabel(), new BatchBufferHttpEntity(batch, bufferSizeBytes));
+      // cleanup
+      loadBatchFirstRecord = true;
+      bufferSizeBytes = 0;
+      numOfRecords = 0;
+      // committed offsets
+      currentOffsets.forEach((k, v) -> offsetToCommit.put(k, v + 1));
+    }
   }
 
   @Override
   public void close() throws SQLException {
+    if (scheduler != null) {
+      scheduler.shutdown();
+    }
+  }
+
+  public Map<TopicPartition, Long> offsetToCommit() {
+    return offsetToCommit;
   }
 }

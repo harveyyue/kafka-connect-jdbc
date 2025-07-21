@@ -268,6 +268,14 @@ public class JdbcSinkConfig extends JdbcConfig {
   private static final String DORIS_FE_PORT_DEFAULT = "8030";
   private static final String DORIS_FE_PORT_DOC = "Specify the port for the doris fe";
 
+  public static final String DORIS_BUFFER_FLUSH_INTERVAL_MS_CONFIG =
+      "doris.buffer.flush.interval.ms";
+  private static final String DORIS_BUFFER_FLUSH_INTERVAL_MS_DISPLAY =
+      "Doris buffer flush interval";
+  private static final long DORIS_BUFFER_FLUSH_INTERVAL_MS_DEFAULT = 10000L;
+  private static final String DORIS_BUFFER_FLUSH_INTERVAL_MS_DOC =
+      "Doris buffer flush interval, default value is 10000 ms";
+
   private static final EnumRecommender QUOTE_METHOD_RECOMMENDER =
       EnumRecommender.in(QuoteMethod.values());
 
@@ -558,6 +566,17 @@ public class JdbcSinkConfig extends JdbcConfig {
             ConfigDef.Width.MEDIUM,
             DORIS_FE_PORT_DISPLAY
         )
+        .define(
+            DORIS_BUFFER_FLUSH_INTERVAL_MS_CONFIG,
+            ConfigDef.Type.LONG,
+            DORIS_BUFFER_FLUSH_INTERVAL_MS_DEFAULT,
+            ConfigDef.Importance.MEDIUM,
+            DORIS_BUFFER_FLUSH_INTERVAL_MS_DOC,
+            DDL_GROUP,
+            5,
+            ConfigDef.Width.MEDIUM,
+            DORIS_BUFFER_FLUSH_INTERVAL_MS_DISPLAY
+        )
         // Retries
         .define(
             MAX_RETRIES,
@@ -615,6 +634,7 @@ public class JdbcSinkConfig extends JdbcConfig {
   public final List<String> topicsExcludeList;
   public final List<UdfField> udfColumnList;
   public final int dorisFePort;
+  public final long dorisBufferFlushIntervalMs;
 
   public JdbcSinkConfig(Map<?, ?> props) {
     super(CONFIG_DEF, props);
@@ -650,6 +670,7 @@ public class JdbcSinkConfig extends JdbcConfig {
     topicsExcludeList = getList(TOPICS_EXCLUDE_LIST_CONFIG);
     udfColumnList = parseUdfColumnList();
     dorisFePort = getInt(DORIS_FE_PORT_CONFIG);
+    dorisBufferFlushIntervalMs = getLong(DORIS_BUFFER_FLUSH_INTERVAL_MS_CONFIG);
   }
 
   private Map<String, String> parseRawTableIdMapping() {
