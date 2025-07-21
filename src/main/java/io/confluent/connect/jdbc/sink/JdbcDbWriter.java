@@ -76,30 +76,7 @@ public class JdbcDbWriter {
     try {
       final Map<TableId, BufferedRecords> bufferByTable = new HashMap<>();
       for (SinkRecord record : records) {
-        TableId tableId;
-        TableShardDefinition tableShardDefinition =
-            config.tableShardDefinitions.get(record.topic());
-        if (tableShardDefinition != null) {
-          Object rawValue = ((Struct) record.value()).get(tableShardDefinition.getShardColumn());
-          if (rawValue == null) {
-            throw new ConnectException("Not specified shard column value in topic "
-                + record.topic());
-          }
-          // raw value maybe come from connect class org.apache.kafka.connect.data.Timestamp
-          if (rawValue instanceof Date) {
-            rawValue = ((Date) rawValue).getTime();
-          }
-          tableId = destinationTable(tableShardDefinition, Long.parseLong(rawValue.toString()));
-        } else {
-          // non-table shard mode
-          tableId = topicToTableIdCache.computeIfAbsent(record.topic(), topic -> {
-            TableId currentTableId = destinationTable(topic);
-            if (tableIdMapping.get(currentTableId) != null) {
-              return tableIdMapping.get(currentTableId);
-            }
-            return currentTableId;
-          });
-        }
+        TableId tableId = getTableId(record);
         BufferedRecords buffer = bufferByTable.computeIfAbsent(tableId, key -> {
           if (dbDialect.name().equalsIgnoreCase("doris")) {
             if (dorisRestService == null) {
@@ -158,5 +135,32 @@ public class JdbcDbWriter {
       ));
     }
     return dbDialect.parseTableIdentifier(tableName);
+  }
+
+  private TableId getTableId(SinkRecord record) {
+    TableId tableId;
+    TableShardDefinition tableShardDefinition =
+        config.tableShardDefinitions.get(record.topic());
+    if (tableShardDefinition != null) {
+      Object rawValue = ((Struct) record.value()).get(tableShardDefinition.getShardColumn());
+      if (rawValue == null) {
+        throw new ConnectException("Not specified shard column value in topic " + record.topic());
+      }
+      // raw value maybe come from connect class org.apache.kafka.connect.data.Timestamp
+      if (rawValue instanceof Date) {
+        rawValue = ((Date) rawValue).getTime();
+      }
+      tableId = destinationTable(tableShardDefinition, Long.parseLong(rawValue.toString()));
+    } else {
+      // non-table shard mode
+      tableId = topicToTableIdCache.computeIfAbsent(record.topic(), topic -> {
+        TableId currentTableId = destinationTable(topic);
+        if (tableIdMapping.get(currentTableId) != null) {
+          return tableIdMapping.get(currentTableId);
+        }
+        return currentTableId;
+      });
+    }
+    return tableId;
   }
 }

@@ -66,7 +66,7 @@ public class DorisStreamLoad {
       int statusCode = response.getStatusLine().getStatusCode();
       if (statusCode == 200 && response.getEntity() != null) {
         String loadResult = EntityUtils.toString(response.getEntity());
-        log.info("Doris stream load response: {}", loadResult);
+        log.debug("Doris stream load response: {}", loadResult);
         StreamLoadContent content =
             dorisRestService.getObjectMapper().readValue(loadResult, StreamLoadContent.class);
         if (!DORIS_SUCCESS_STATUS.contains(content.getStatus())) {

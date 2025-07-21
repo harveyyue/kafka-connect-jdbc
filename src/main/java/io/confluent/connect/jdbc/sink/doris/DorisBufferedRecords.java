@@ -28,8 +28,8 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 
@@ -38,9 +38,9 @@ public class DorisBufferedRecords extends AbstractBufferedRecords {
 
   private static final String LINE_DELIMITER = "\n";
 
+  private final List<byte[]> buffer = new ArrayList<>();
   private final DorisJsonConverter dorisJsonConverter;
   private final DorisStreamLoad dorisStreamLoad;
-  private final LinkedList<byte[]> buffer;
   private final byte[] lineDelimiter;
 
   private boolean loadBatchFirstRecord = true;
@@ -58,7 +58,6 @@ public class DorisBufferedRecords extends AbstractBufferedRecords {
     super(config, tableId, dbDialect, dbStructure, connection);
     this.dorisJsonConverter = DorisJsonConverter.getInstance();
     this.dorisStreamLoad = new DorisStreamLoad(dorisRestService, tableId);
-    this.buffer = new LinkedList<>();
     this.lineDelimiter = LINE_DELIMITER.getBytes();
   }
 
@@ -119,11 +118,10 @@ public class DorisBufferedRecords extends AbstractBufferedRecords {
       loadBatchFirstRecord = false;
     } else {
       buffer.add(lineDelimiter);
-      bufferSizeBytes += lineDelimiter.length;
       recordSize += lineDelimiter.length;
     }
     buffer.add(json);
-    bufferSizeBytes += json.length;
+    bufferSizeBytes += recordSize;
     numOfRecords++;
     return recordSize;
   }
@@ -146,14 +144,15 @@ public class DorisBufferedRecords extends AbstractBufferedRecords {
 
     log.debug("Flushing {} buffered records", numOfRecords);
     dorisStreamLoad.load(generateBatchLabel(), new BatchBufferHttpEntity(buffer, bufferSizeBytes));
+    // cleanup
+    loadBatchFirstRecord = true;
+    bufferSizeBytes = 0;
+    numOfRecords = 0;
     buffer.clear();
     return Collections.emptyList();
   }
 
   @Override
   public void close() throws SQLException {
-    loadBatchFirstRecord = true;
-    bufferSizeBytes = 0;
-    numOfRecords = 0;
   }
 }
