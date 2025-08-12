@@ -167,7 +167,8 @@ public class DorisDatabaseDialect extends MySqlDatabaseDialect {
             f.schemaType()
         );
       } else {
-        builder.append(" NOT NULL");
+        // change constraint from "not null" to "null" if no default value
+        builder.append(" NULL");
       }
     }
   }
